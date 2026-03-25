@@ -19,7 +19,7 @@ It aggregates tender opportunities from Australian public procurement(AusTenders
 - **Database & Caching**: PostgreSQL, Timescale extension, Redis
 - **Deployment**: Docker, Kubernetes, MicroK8s
 
-
+## Architecture
 ```mermaid
 graph TD
   extData[External Data]
