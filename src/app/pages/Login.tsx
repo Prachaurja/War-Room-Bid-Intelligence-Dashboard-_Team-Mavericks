@@ -37,14 +37,14 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        <Card className="p-8 shadow-xl border-0">
+        <Card className="p-8 shadow-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
           <div className="text-center mb-8">
             <motion.div
               initial={{ scale: 0 }}
@@ -55,7 +55,7 @@ export default function Login() {
               <Building2 className="w-8 h-8 text-white" />
             </motion.div>
             <h1 className="text-3xl mb-2">Tendora Dashboard</h1>
-            <p className="text-slate-600">Sign in to access your dashboard</p>
+            <p className="text-slate-600 dark:text-slate-300">Sign in to access your dashboard</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,12 +109,6 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-600">
-              Demo: Use any email and password to login
-            </p>
-          </div>
         </Card>
       </motion.div>
     </div>
