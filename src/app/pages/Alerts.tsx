@@ -183,6 +183,22 @@ export default function Alerts() {
     );
   };
 
+  const createAlert = () => {
+    const now = new Date();
+    const id = `ALT-${String(alerts.length + 1).padStart(3, "0")}`;
+    const newAlert: Alert = {
+      id,
+      title: "Manual Alert",
+      description: "New alert created from dashboard.",
+      type: "system",
+      priority: "low",
+      timestamp: now.toISOString(),
+      read: false,
+    };
+
+    setAlerts((prev) => [newAlert, ...prev]);
+  };
+
   const getAlertIcon = (type: string) => {
     switch (type) {
       case "tender":
@@ -229,7 +245,7 @@ export default function Alerts() {
           <Button variant="outline" onClick={markAllAsRead}>
             Mark All Read
           </Button>
-          <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
+          <Button className="bg-gradient-to-r from-blue-600 to-purple-600" onClick={createAlert}>
             <Plus className="w-4 h-4 mr-2" />
             Create Alert
           </Button>

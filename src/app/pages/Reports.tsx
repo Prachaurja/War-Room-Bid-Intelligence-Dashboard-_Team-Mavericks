@@ -61,7 +61,11 @@ const regionalPerformance = [
 
 export default function Reports() {
   const exportToPDF = () => {
-    alert("PDF export functionality would be implemented here");
+    const title = `reports-${new Date().toISOString().split("T")[0]}`;
+    const previousTitle = document.title;
+    document.title = title;
+    window.print();
+    document.title = previousTitle;
   };
 
   const exportReportData = () => {

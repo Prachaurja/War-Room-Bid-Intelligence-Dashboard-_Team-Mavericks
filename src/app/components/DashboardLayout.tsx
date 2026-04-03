@@ -37,6 +37,10 @@ export default function DashboardLayout() {
     navigate("/login");
   };
 
+  const handleOpenSettings = () => {
+    navigate("/alerts");
+  };
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
       {/* Mobile sidebar backdrop */}
@@ -135,6 +139,7 @@ export default function DashboardLayout() {
                 variant="ghost"
                 size="sm"
                 className="flex-1 text-slate-300 hover:text-white hover:bg-slate-800"
+                onClick={handleOpenSettings}
               >
                 <Settings className="w-4 h-4" />
               </Button>

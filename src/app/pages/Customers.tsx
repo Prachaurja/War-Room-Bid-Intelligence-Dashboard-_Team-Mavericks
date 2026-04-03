@@ -113,8 +113,9 @@ const customersData = [
 
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [customers, setCustomers] = useState(customersData);
 
-  const filteredCustomers = customersData.filter(
+  const filteredCustomers = customers.filter(
     (customer) =>
       customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -142,6 +143,24 @@ export default function Customers() {
     }
   };
 
+  const addCustomer = () => {
+    const timestamp = Date.now();
+    const nextId = `CUS-${String(customers.length + 1).padStart(3, "0")}`;
+    const newCustomer = {
+      id: nextId,
+      name: `New Customer ${customers.length + 1}`,
+      email: `new.customer.${timestamp}@example.com`,
+      phone: "N/A",
+      location: "Australia",
+      totalOrders: 0,
+      totalSpent: 0,
+      status: "active",
+      lastOrder: "Never",
+    };
+
+    setCustomers((prev) => [newCustomer, ...prev]);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -150,7 +169,7 @@ export default function Customers() {
           <h1 className="text-3xl">Customers</h1>
           <p className="text-slate-600 mt-1">Manage and view customer information</p>
         </div>
-        <Button>Add Customer</Button>
+        <Button onClick={addCustomer}>Add Customer</Button>
       </div>
 
       {/* Stats */}

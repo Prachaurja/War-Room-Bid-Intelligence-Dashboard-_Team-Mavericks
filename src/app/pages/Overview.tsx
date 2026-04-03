@@ -94,8 +94,11 @@ export default function Overview() {
   const [timeRange, setTimeRange] = useState("12m");
 
   const exportToPDF = () => {
-    // Mock PDF export
-    alert("PDF export functionality would be implemented here");
+    const title = `overview-${new Date().toISOString().split("T")[0]}`;
+    const previousTitle = document.title;
+    document.title = title;
+    window.print();
+    document.title = previousTitle;
   };
 
   return (
