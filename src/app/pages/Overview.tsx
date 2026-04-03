@@ -92,52 +92,198 @@ const regionalTrendData = [
 
 export default function Overview() {
   const [timeRange, setTimeRange] = useState("12m");
+  const [isExporting, setIsExporting] = useState(false);
 
   const exportToPDF = async () => {
-    const { default: jsPDF } = await import("jspdf");
-    const doc = new jsPDF();
+    if (isExporting) return;
 
-    const totalRevenue = revenueData.reduce((sum, m) => sum + m.revenue, 0);
-    const totalProfit = revenueData.reduce((sum, m) => sum + m.profit, 0);
+    try {
+      setIsExporting(true);
+      const { default: jsPDF } = await import("jspdf");
+      const pdf = new jsPDF("p", "mm", "a4");
 
-    doc.setFontSize(16);
-    doc.text("War Room Overview Report", 14, 16);
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+      const totalRevenue = revenueData.reduce((sum, m) => sum + m.revenue, 0);
+      const totalProfit = revenueData.reduce((sum, m) => sum + m.profit, 0);
+      const totalBidCount = bidTrendData.reduce((sum, m) => sum + m.count, 0);
+      const totalBidValueK = bidTrendData.reduce((sum, m) => sum + m.value, 0);
 
-    let y = 32;
-    doc.setFontSize(12);
-    doc.text("KPI Summary", 14, y);
-    y += 8;
-    doc.setFontSize(10);
-    doc.text(`Total Revenue (12m): $${totalRevenue.toLocaleString()}`, 14, y);
-    y += 6;
-    doc.text(`Total Profit (12m): $${totalProfit.toLocaleString()}`, 14, y);
-    y += 6;
-    doc.text(`Revenue Categories Tracked: ${categoryData.length}`, 14, y);
-    y += 10;
+      // Header
+      pdf.setFillColor(37, 99, 235);
+      pdf.rect(0, 0, 210, 24, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(16);
+      pdf.text("War Room Overview Report", 14, 14);
+      pdf.setFontSize(10);
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, 14, 20);
 
-    doc.setFontSize(12);
-    doc.text("Bid Trend (Last 6 months)", 14, y);
-    y += 8;
-    doc.setFontSize(10);
-    bidTrendData.forEach((item) => {
-      doc.text(`${item.month}: ${item.count} bids, value $${item.value}K`, 14, y);
+      // KPI cards
+      pdf.setTextColor(15, 23, 42);
+      const cardY = 34;
+      const cardW = 44;
+      const cardH = 28;
+      const gap = 4;
+      const kpis = [
+        { title: "Total Revenue", value: `$${Math.round(totalRevenue / 1000)}K` },
+        { title: "Total Profit", value: `$${Math.round(totalProfit / 1000)}K` },
+        { title: "Total Bids", value: `${totalBidCount}` },
+        { title: "Bid Value", value: `$${Math.round(totalBidValueK / 1000)}M` },
+      ];
+
+      kpis.forEach((kpi, i) => {
+        const x = 14 + i * (cardW + gap);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.setFillColor(248, 250, 252);
+        pdf.roundedRect(x, cardY, cardW, cardH, 2, 2, "FD");
+        pdf.setFontSize(9);
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(kpi.title, x + 3, cardY + 8);
+        pdf.setFontSize(14);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(kpi.value, x + 3, cardY + 18);
+      });
+
+      // Section 1: Bid trend line chart
+      let y = 74;
+      pdf.setFontSize(12);
+      pdf.setTextColor(30, 41, 59);
+      pdf.text("Bid Count Trend", 14, y);
+      y += 4;
+
+      const chartX = 14;
+      const chartY = y + 2;
+      const chartW = 182;
+      const chartH = 52;
+
+      pdf.setDrawColor(226, 232, 240);
+      pdf.rect(chartX, chartY, chartW, chartH);
+
+      const maxCount = Math.max(...bidTrendData.map((d) => d.count));
+      const minCount = Math.min(...bidTrendData.map((d) => d.count));
+      const range = Math.max(1, maxCount - minCount);
+
+      // Grid lines
+      for (let i = 1; i <= 4; i++) {
+        const gy = chartY + (chartH / 5) * i;
+        pdf.setDrawColor(241, 245, 249);
+        pdf.line(chartX, gy, chartX + chartW, gy);
+      }
+
+      // Plot line
+      pdf.setDrawColor(37, 99, 235);
+      pdf.setLineWidth(0.8);
+      bidTrendData.forEach((point, idx) => {
+        const px = chartX + (idx * chartW) / (bidTrendData.length - 1);
+        const normalized = (point.count - minCount) / range;
+        const py = chartY + chartH - normalized * (chartH - 4) - 2;
+
+        if (idx > 0) {
+          const prev = bidTrendData[idx - 1];
+          const prevX = chartX + ((idx - 1) * chartW) / (bidTrendData.length - 1);
+          const prevNorm = (prev.count - minCount) / range;
+          const prevY = chartY + chartH - prevNorm * (chartH - 4) - 2;
+          pdf.line(prevX, prevY, px, py);
+        }
+
+        pdf.setFillColor(37, 99, 235);
+        pdf.circle(px, py, 1.1, "F");
+      });
+
+      // X labels
+      pdf.setTextColor(71, 85, 105);
+      pdf.setFontSize(8);
+      bidTrendData.forEach((point, idx) => {
+        const px = chartX + (idx * chartW) / (bidTrendData.length - 1);
+        pdf.text(point.month, px - 3, chartY + chartH + 5);
+      });
+
+      // Keep compact table under chart
+      y = chartY + chartH + 12;
+      pdf.setFillColor(241, 245, 249);
+      pdf.rect(14, y, 182, 8, "F");
+      pdf.setFontSize(9);
+      pdf.setTextColor(51, 65, 85);
+      pdf.text("Month", 18, y + 5.5);
+      pdf.text("Bid Count", 80, y + 5.5);
+      pdf.text("Value ($K)", 130, y + 5.5);
+      pdf.text("Avg Value", 170, y + 5.5);
+      y += 10;
+
+      bidTrendData.forEach((row) => {
+        pdf.setDrawColor(226, 232, 240);
+        pdf.line(14, y, 196, y);
+        pdf.setFontSize(9);
+        pdf.setTextColor(30, 41, 59);
+        pdf.text(row.month, 18, y + 4.5);
+        pdf.text(String(row.count), 82, y + 4.5);
+        pdf.text(String(row.value), 132, y + 4.5);
+        pdf.text(String(row.avgValue), 172, y + 4.5);
+        y += 8;
+      });
+
+      // Section 2 on page 2: regional bar chart + table
+      pdf.addPage();
+      y = 20;
+      pdf.setFontSize(12);
+      pdf.setTextColor(30, 41, 59);
+      pdf.text("Regional Bid Distribution", 14, y);
       y += 6;
-    });
 
-    doc.addPage();
-    y = 16;
-    doc.setFontSize(12);
-    doc.text("Regional Distribution", 14, y);
-    y += 8;
-    doc.setFontSize(10);
-    regionalTrendData.forEach((item) => {
-      doc.text(`${item.region}: ${item.count} bids, value $${item.value}K`, 14, y);
-      y += 6;
-    });
+      const barX = 18;
+      const barY = y + 2;
+      const barW = 170;
+      const barH = 60;
+      const rowH = 8;
+      const maxRegional = Math.max(...regionalTrendData.map((r) => r.count));
 
-    doc.save(`overview-report-${new Date().toISOString().split("T")[0]}.pdf`);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.rect(barX - 4, barY - 2, barW + 8, barH + 6);
+
+      regionalTrendData.forEach((row, idx) => {
+        const yPos = barY + idx * rowH;
+        const valueW = (row.count / maxRegional) * (barW - 35);
+
+        pdf.setTextColor(71, 85, 105);
+        pdf.setFontSize(8);
+        pdf.text(row.region, barX, yPos + 5);
+
+        pdf.setFillColor(59, 130, 246);
+        pdf.rect(barX + 18, yPos + 1.5, valueW, 4.5, "F");
+
+        pdf.setTextColor(30, 41, 59);
+        pdf.text(String(row.count), barX + 20 + valueW + 2, yPos + 5);
+      });
+
+      y = barY + barH + 10;
+      pdf.setFillColor(241, 245, 249);
+      pdf.rect(14, y, 182, 8, "F");
+      pdf.setFontSize(9);
+      pdf.text("Region", 18, y + 5.5);
+      pdf.text("Bid Count", 95, y + 5.5);
+      pdf.text("Value ($K)", 150, y + 5.5);
+      y += 10;
+
+      regionalTrendData.forEach((row) => {
+        pdf.setDrawColor(226, 232, 240);
+        pdf.line(14, y, 196, y);
+        pdf.setFontSize(9);
+        pdf.setTextColor(30, 41, 59);
+        pdf.text(row.region, 18, y + 4.5);
+        pdf.text(String(row.count), 97, y + 4.5);
+        pdf.text(String(row.value), 152, y + 4.5);
+        y += 8;
+      });
+
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text("Generated by Team Mavericks - War Room Bid Intelligence Dashboard", 14, 287);
+
+      pdf.save(`overview-report-${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (error) {
+      console.error("Overview PDF export failed:", error);
+      alert("PDF export failed. Check browser console for details.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -153,9 +299,14 @@ export default function Overview() {
           <p className="text-slate-600 mt-1">Welcome back to your dashboard</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportToPDF}>
+          <Button
+            size="sm"
+            onClick={exportToPDF}
+            disabled={isExporting}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+          >
             <FileText className="w-4 h-4 mr-2" />
-            Export PDF
+            {isExporting ? "Exporting..." : "Export PDF"}
           </Button>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-36">
@@ -208,8 +359,9 @@ export default function Overview() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
+            className="h-full"
           >
-            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <Card className="h-full min-h-[150px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-6 hover:shadow-xl transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <p className="text-sm text-slate-600 dark:text-slate-300">{kpi.title}</p>
@@ -229,7 +381,7 @@ export default function Overview() {
                   <kpi.icon className="w-6 h-6 text-white" />
                 </div>
               </div>
-            </div>
+            </Card>
           </motion.div>
         ))}
       </div>

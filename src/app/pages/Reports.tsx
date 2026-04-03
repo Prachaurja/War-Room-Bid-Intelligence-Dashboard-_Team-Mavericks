@@ -1,6 +1,6 @@
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Download, Calendar, TrendingUp, TrendingDown, FileText } from "lucide-react";
+import { Download, Calendar, TrendingUp, TrendingDown } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -60,49 +60,6 @@ const regionalPerformance = [
 ];
 
 export default function Reports() {
-  const exportToPDF = async () => {
-    const { default: jsPDF } = await import("jspdf");
-    const doc = new jsPDF();
-
-    doc.setFontSize(16);
-    doc.text("War Room Reports Snapshot", 14, 16);
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
-
-    let y = 32;
-    doc.setFontSize(12);
-    doc.text("Recent Reports", 14, y);
-    y += 8;
-    doc.setFontSize(10);
-    reportSummaries.forEach((report) => {
-      doc.text(`${report.title} (${report.period}) - ${report.status}`, 14, y);
-      y += 6;
-    });
-
-    y += 6;
-    doc.setFontSize(12);
-    doc.text("Top Products", 14, y);
-    y += 8;
-    doc.setFontSize(10);
-    topProducts.forEach((product) => {
-      doc.text(`${product.name}: sales ${product.sales}, revenue $${product.revenue.toLocaleString()}`, 14, y);
-      y += 6;
-    });
-
-    doc.addPage();
-    y = 16;
-    doc.setFontSize(12);
-    doc.text("Regional Performance", 14, y);
-    y += 8;
-    doc.setFontSize(10);
-    regionalPerformance.forEach((region) => {
-      doc.text(`${region.region}: $${region.revenue.toLocaleString()}, orders ${region.orders}, growth ${region.growth}%`, 14, y);
-      y += 6;
-    });
-
-    doc.save(`reports-${new Date().toISOString().split("T")[0]}.pdf`);
-  };
-
   const exportReportData = () => {
     const headers = ["Product", "Sales", "Revenue", "Change"];
     const rows = topProducts.map(p => [
@@ -134,13 +91,12 @@ export default function Reports() {
           <p className="text-slate-600 mt-1">Generate and view detailed business reports</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportReportData}>
+          <Button
+            onClick={exportReportData}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+          >
             <Download className="w-4 h-4 mr-2" />
             Export CSV
-          </Button>
-          <Button onClick={exportToPDF} className="bg-gradient-to-r from-blue-600 to-purple-600">
-            <FileText className="w-4 h-4 mr-2" />
-            Export PDF
           </Button>
         </div>
       </motion.div>

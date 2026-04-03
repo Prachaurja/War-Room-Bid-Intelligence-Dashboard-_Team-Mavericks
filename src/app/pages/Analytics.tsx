@@ -97,9 +97,13 @@ export default function Analytics() {
             <Filter className="w-4 h-4 mr-2" />
             Filter
           </Button>
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
+          <Button
+            size="sm"
+            onClick={exportToCSV}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+          >
             <Download className="w-4 h-4 mr-2" />
-            Export
+            Export CSV
           </Button>
         </div>
       </motion.div>

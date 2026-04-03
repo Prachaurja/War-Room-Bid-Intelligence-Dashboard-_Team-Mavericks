@@ -271,8 +271,9 @@ export default function Tenders() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
+            className="h-full"
           >
-            <Card className="p-6 border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <Card className="h-full min-h-[150px] p-6 border-0 shadow-lg hover:shadow-xl transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-600">{stat.label}</p>
