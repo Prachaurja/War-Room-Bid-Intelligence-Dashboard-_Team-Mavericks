@@ -9,7 +9,9 @@ import {
   Gavel,
   Bell,
   LogOut,
-  Settings
+  Settings,
+  Moon,
+  Sun
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -22,6 +24,7 @@ export default function DashboardLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [notifications] = useState(12);
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
 
   const navigation = [
     { name: "Overview", href: "/", icon: LayoutDashboard },
@@ -41,8 +44,15 @@ export default function DashboardLayout() {
     navigate("/alerts");
   };
 
+  const toggleTheme = () => {
+    const nextMode = isDarkMode ? "light" : "dark";
+    document.documentElement.classList.toggle("dark", nextMode === "dark");
+    localStorage.setItem("theme-preference", nextMode);
+    setIsDarkMode(nextMode === "dark");
+  };
+
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -159,7 +169,7 @@ export default function DashboardLayout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white/80 backdrop-blur-lg border-b border-slate-200 flex items-center px-6 shadow-sm">
+        <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800 flex items-center px-6 shadow-sm">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100"
@@ -167,14 +177,18 @@ export default function DashboardLayout() {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1 flex items-center justify-between">
-            <div className="text-sm text-slate-600">
-              {new Date().toLocaleDateString("en-US", { 
-                weekday: "long", 
-                year: "numeric", 
-                month: "long", 
-                day: "numeric" 
+            <div className="text-sm text-slate-600 dark:text-slate-300">
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric"
               })}
             </div>
+            <Button variant="outline" size="sm" onClick={toggleTheme}>
+              {isDarkMode ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
+              {isDarkMode ? "Light" : "Dark"}
+            </Button>
           </div>
         </header>
 

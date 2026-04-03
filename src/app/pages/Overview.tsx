@@ -93,12 +93,51 @@ const regionalTrendData = [
 export default function Overview() {
   const [timeRange, setTimeRange] = useState("12m");
 
-  const exportToPDF = () => {
-    const title = `overview-${new Date().toISOString().split("T")[0]}`;
-    const previousTitle = document.title;
-    document.title = title;
-    window.print();
-    document.title = previousTitle;
+  const exportToPDF = async () => {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+
+    const totalRevenue = revenueData.reduce((sum, m) => sum + m.revenue, 0);
+    const totalProfit = revenueData.reduce((sum, m) => sum + m.profit, 0);
+
+    doc.setFontSize(16);
+    doc.text("War Room Overview Report", 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+
+    let y = 32;
+    doc.setFontSize(12);
+    doc.text("KPI Summary", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    doc.text(`Total Revenue (12m): $${totalRevenue.toLocaleString()}`, 14, y);
+    y += 6;
+    doc.text(`Total Profit (12m): $${totalProfit.toLocaleString()}`, 14, y);
+    y += 6;
+    doc.text(`Revenue Categories Tracked: ${categoryData.length}`, 14, y);
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.text("Bid Trend (Last 6 months)", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    bidTrendData.forEach((item) => {
+      doc.text(`${item.month}: ${item.count} bids, value $${item.value}K`, 14, y);
+      y += 6;
+    });
+
+    doc.addPage();
+    y = 16;
+    doc.setFontSize(12);
+    doc.text("Regional Distribution", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    regionalTrendData.forEach((item) => {
+      doc.text(`${item.region}: ${item.count} bids, value $${item.value}K`, 14, y);
+      y += 6;
+    });
+
+    doc.save(`overview-report-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   return (

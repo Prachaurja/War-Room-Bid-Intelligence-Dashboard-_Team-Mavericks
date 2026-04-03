@@ -27,6 +27,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
 
 interface Alert {
   id: string;
@@ -152,6 +161,13 @@ export default function Alerts() {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(mockSavedSearches);
   const [filterType, setFilterType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [draftAlert, setDraftAlert] = useState({
+    title: "",
+    description: "",
+    type: "system" as Alert["type"],
+    priority: "low" as Alert["priority"],
+  });
 
   const filteredAlerts = alerts.filter((alert) => {
     const matchesType = filterType === "all" || alert.type === filterType;
@@ -184,19 +200,23 @@ export default function Alerts() {
   };
 
   const createAlert = () => {
+    if (!draftAlert.title || !draftAlert.description) return;
+
     const now = new Date();
     const id = `ALT-${String(alerts.length + 1).padStart(3, "0")}`;
     const newAlert: Alert = {
       id,
-      title: "Manual Alert",
-      description: "New alert created from dashboard.",
-      type: "system",
-      priority: "low",
+      title: draftAlert.title,
+      description: draftAlert.description,
+      type: draftAlert.type,
+      priority: draftAlert.priority,
       timestamp: now.toISOString(),
       read: false,
     };
 
     setAlerts((prev) => [newAlert, ...prev]);
+    setDraftAlert({ title: "", description: "", type: "system", priority: "low" });
+    setIsCreateOpen(false);
   };
 
   const getAlertIcon = (type: string) => {
@@ -245,10 +265,61 @@ export default function Alerts() {
           <Button variant="outline" onClick={markAllAsRead}>
             Mark All Read
           </Button>
-          <Button className="bg-gradient-to-r from-blue-600 to-purple-600" onClick={createAlert}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Alert
-          </Button>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Alert
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Alert</DialogTitle>
+                <DialogDescription>Provide alert details, then confirm.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <Input
+                  placeholder="Alert title"
+                  value={draftAlert.title}
+                  onChange={(e) => setDraftAlert((prev) => ({ ...prev, title: e.target.value }))}
+                />
+                <Input
+                  placeholder="Alert description"
+                  value={draftAlert.description}
+                  onChange={(e) => setDraftAlert((prev) => ({ ...prev, description: e.target.value }))}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Select
+                    value={draftAlert.type}
+                    onValueChange={(value) => setDraftAlert((prev) => ({ ...prev, type: value as Alert["type"] }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="system">System</SelectItem>
+                      <SelectItem value="tender">Tender</SelectItem>
+                      <SelectItem value="bid">Bid</SelectItem>
+                      <SelectItem value="report">Report</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={draftAlert.priority}
+                    onValueChange={(value) => setDraftAlert((prev) => ({ ...prev, priority: value as Alert["priority"] }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                <Button onClick={createAlert} disabled={!draftAlert.title || !draftAlert.description}>Confirm Create</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </motion.div>
 

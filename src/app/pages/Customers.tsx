@@ -19,6 +19,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
 
 const customersData = [
   {
@@ -114,6 +123,14 @@ const customersData = [
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [customers, setCustomers] = useState(customersData);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [draftCustomer, setDraftCustomer] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    status: "active",
+  });
 
   const filteredCustomers = customers.filter(
     (customer) =>
@@ -144,21 +161,24 @@ export default function Customers() {
   };
 
   const addCustomer = () => {
-    const timestamp = Date.now();
+    if (!draftCustomer.name || !draftCustomer.email) return;
+
     const nextId = `CUS-${String(customers.length + 1).padStart(3, "0")}`;
     const newCustomer = {
       id: nextId,
-      name: `New Customer ${customers.length + 1}`,
-      email: `new.customer.${timestamp}@example.com`,
-      phone: "N/A",
-      location: "Australia",
+      name: draftCustomer.name,
+      email: draftCustomer.email,
+      phone: draftCustomer.phone || "N/A",
+      location: draftCustomer.location || "Unknown",
       totalOrders: 0,
       totalSpent: 0,
-      status: "active",
+      status: draftCustomer.status,
       lastOrder: "Never",
     };
 
     setCustomers((prev) => [newCustomer, ...prev]);
+    setDraftCustomer({ name: "", email: "", phone: "", location: "", status: "active" });
+    setIsCreateOpen(false);
   };
 
   return (
@@ -169,7 +189,44 @@ export default function Customers() {
           <h1 className="text-3xl">Customers</h1>
           <p className="text-slate-600 mt-1">Manage and view customer information</p>
         </div>
-        <Button onClick={addCustomer}>Add Customer</Button>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button>Add Customer</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Customer</DialogTitle>
+              <DialogDescription>Fill customer details before adding.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                placeholder="Full name"
+                value={draftCustomer.name}
+                onChange={(e) => setDraftCustomer((prev) => ({ ...prev, name: e.target.value }))}
+              />
+              <Input
+                type="email"
+                placeholder="Email"
+                value={draftCustomer.email}
+                onChange={(e) => setDraftCustomer((prev) => ({ ...prev, email: e.target.value }))}
+              />
+              <Input
+                placeholder="Phone"
+                value={draftCustomer.phone}
+                onChange={(e) => setDraftCustomer((prev) => ({ ...prev, phone: e.target.value }))}
+              />
+              <Input
+                placeholder="Location"
+                value={draftCustomer.location}
+                onChange={(e) => setDraftCustomer((prev) => ({ ...prev, location: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+              <Button onClick={addCustomer} disabled={!draftCustomer.name || !draftCustomer.email}>Confirm Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats */}

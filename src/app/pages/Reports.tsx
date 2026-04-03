@@ -60,12 +60,47 @@ const regionalPerformance = [
 ];
 
 export default function Reports() {
-  const exportToPDF = () => {
-    const title = `reports-${new Date().toISOString().split("T")[0]}`;
-    const previousTitle = document.title;
-    document.title = title;
-    window.print();
-    document.title = previousTitle;
+  const exportToPDF = async () => {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("War Room Reports Snapshot", 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+
+    let y = 32;
+    doc.setFontSize(12);
+    doc.text("Recent Reports", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    reportSummaries.forEach((report) => {
+      doc.text(`${report.title} (${report.period}) - ${report.status}`, 14, y);
+      y += 6;
+    });
+
+    y += 6;
+    doc.setFontSize(12);
+    doc.text("Top Products", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    topProducts.forEach((product) => {
+      doc.text(`${product.name}: sales ${product.sales}, revenue $${product.revenue.toLocaleString()}`, 14, y);
+      y += 6;
+    });
+
+    doc.addPage();
+    y = 16;
+    doc.setFontSize(12);
+    doc.text("Regional Performance", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    regionalPerformance.forEach((region) => {
+      doc.text(`${region.region}: $${region.revenue.toLocaleString()}, orders ${region.orders}, growth ${region.growth}%`, 14, y);
+      y += 6;
+    });
+
+    doc.save(`reports-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   const exportReportData = () => {
