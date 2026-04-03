@@ -209,10 +209,10 @@ export default function Overview() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <div className="bg-white rounded-xl border-0 shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-6 hover:shadow-xl transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <p className="text-sm text-slate-600">{kpi.title}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{kpi.title}</p>
                   <p className="text-3xl mt-2">{kpi.value}</p>
                   <div className="flex items-center gap-1 mt-3">
                     <span
@@ -222,7 +222,7 @@ export default function Overview() {
                     >
                       {kpi.change >= 0 ? "↑" : "↓"} {Math.abs(kpi.change)}%
                     </span>
-                    <span className="text-sm text-slate-500">vs last month</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">vs last month</span>
                   </div>
                 </div>
                 <div className={`${kpi.iconColor} p-4 rounded-2xl shadow-lg`}>

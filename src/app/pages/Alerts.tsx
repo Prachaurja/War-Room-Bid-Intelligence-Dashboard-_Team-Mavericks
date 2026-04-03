@@ -325,50 +325,31 @@ export default function Alerts() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4 border-0 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-red-500 to-pink-600">
-              <Bell className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl">{unreadCount}</p>
-              <p className="text-sm text-slate-600">Unread Alerts</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-0 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600">
-              <Search className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl">{savedSearches.length}</p>
-              <p className="text-sm text-slate-600">Saved Searches</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-0 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
-              <Mail className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl">24</p>
-              <p className="text-sm text-slate-600">Email Sent</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-0 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600">
-              <MessageSquare className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl">12</p>
-              <p className="text-sm text-slate-600">Matches Today</p>
-            </div>
-          </div>
-        </Card>
+        {[
+          { label: "Unread Alerts", value: unreadCount, icon: Bell, bg: "from-red-500 to-pink-600" },
+          { label: "Saved Searches", value: savedSearches.length, icon: Search, bg: "from-blue-500 to-cyan-600" },
+          { label: "Email Sent", value: 24, icon: Mail, bg: "from-green-500 to-emerald-600" },
+          { label: "Matches Today", value: 12, icon: MessageSquare, bg: "from-purple-500 to-pink-600" },
+        ].map((item, index) => (
+          <motion.div
+            key={item.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+          >
+            <Card className="p-4 border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-xl bg-gradient-to-br ${item.bg}`}>
+                  <item.icon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl">{item.value}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{item.label}</p>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -411,27 +392,31 @@ export default function Alerts() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
                   className={`p-4 rounded-xl border transition-all hover:shadow-md ${
-                    alert.read ? "bg-slate-50" : "bg-white border-blue-200"
+                    alert.read
+                      ? "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+                      : "bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-700/60"
                   }`}
                 >
                   <div className="flex items-start gap-4">
                     <div
                       className={`p-2 rounded-lg ${
-                        alert.read ? "bg-slate-200 text-slate-600" : "bg-blue-100 text-blue-600"
+                        alert.read
+                          ? "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                          : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300"
                       }`}
                     >
                       {getAlertIcon(alert.type)}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-1">
-                        <h4 className={alert.read ? "text-slate-700" : ""}>{alert.title}</h4>
+                        <h4 className={alert.read ? "text-slate-700 dark:text-slate-200" : ""}>{alert.title}</h4>
                         <Badge className={`${getPriorityColor(alert.priority)} border text-xs`}>
                           {alert.priority}
                         </Badge>
                       </div>
-                      <p className="text-sm text-slate-600 mb-2">{alert.description}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">{alert.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
                           {new Date(alert.timestamp).toLocaleString()}
                         </span>
                         <div className="flex gap-2">

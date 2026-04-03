@@ -13,6 +13,7 @@ import {
 import { Badge } from "../components/ui/badge";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { useState } from "react";
+import { motion } from "motion/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -191,7 +192,7 @@ export default function Customers() {
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button>Add Customer</Button>
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">Add Customer</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -231,26 +232,25 @@ export default function Customers() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <p className="text-sm text-slate-600">Total Customers</p>
-          <p className="text-3xl mt-2">5,500</p>
-          <p className="text-sm text-green-600 mt-1">+12% from last month</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-slate-600">Active Customers</p>
-          <p className="text-3xl mt-2">4,234</p>
-          <p className="text-sm text-slate-500 mt-1">77% of total</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-slate-600">VIP Customers</p>
-          <p className="text-3xl mt-2">156</p>
-          <p className="text-sm text-purple-600 mt-1">High value</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-slate-600">Avg. Order Value</p>
-          <p className="text-3xl mt-2">$487</p>
-          <p className="text-sm text-green-600 mt-1">+8% this month</p>
-        </Card>
+        {[
+          { label: "Total Customers", value: "5,500", detail: "+12% from last month", detailClass: "text-green-600" },
+          { label: "Active Customers", value: "4,234", detail: "77% of total", detailClass: "text-slate-500 dark:text-slate-400" },
+          { label: "VIP Customers", value: "156", detail: "High value", detailClass: "text-purple-600" },
+          { label: "Avg. Order Value", value: "$487", detail: "+8% this month", detailClass: "text-green-600" },
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+          >
+            <Card className="p-4 border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <p className="text-sm text-slate-600 dark:text-slate-300">{stat.label}</p>
+              <p className="text-3xl mt-2">{stat.value}</p>
+              <p className={`text-sm mt-1 ${stat.detailClass}`}>{stat.detail}</p>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
       {/* Search */}
