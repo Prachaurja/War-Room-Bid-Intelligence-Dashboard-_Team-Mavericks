@@ -1,0 +1,84 @@
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: var(--topbar-height);
+    background: rgba(13,17,23,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    flex-shrink: 0;
+  }
+  
+  .left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  
+  .menuBtn {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    transition: var(--transition-fast);
+  }
+  .menuBtn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  
+  
+  .pageTitle {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+  
+  .pageSub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+  
+  .right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .iconBtn {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    transition: var(--transition-fast);
+  }
+  .iconBtn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  
+  .notifBtn {
+    position: relative;
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    transition: var(--transition-fast);
+  }
+  .notifBtn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  
+  .notifDot {
+    position: absolute;
+    top: 7px; right: 7px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 1.5px solid var(--bg-base);
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  .spinning { animation: spin 0.6s linear infinite; }
