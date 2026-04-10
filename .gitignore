@@ -23,3 +23,4 @@ pids
 dist/
 .env
 .env.local
+venv
