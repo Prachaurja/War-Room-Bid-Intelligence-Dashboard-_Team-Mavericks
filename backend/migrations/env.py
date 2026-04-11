@@ -13,6 +13,7 @@ from app.core.database import Base
 
 # Import model modules so tables register on Base.metadata (Alembic autogenerate).
 import app.models.tender  # noqa: F401
+import app.models.user  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
