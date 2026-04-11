@@ -2,23 +2,26 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.ingestion.scheduler import start_scheduler, stop_scheduler
 from app.routers.tenders_router import router as tenders_router
+from app.routers.auth_router import router as auth_router
 import logging
 
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
-    title="Prompcorp's War Room - Bid Intelligence Dashboard",
-    version="0.1.0",
+    title="Prompcorp's War Room — Bid Intelligence Dashboard",
+    description="Aggregates Australian Government Tender Data for Prompcorp",
+    version="0.2.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # allows ALL origins during development
-    allow_credentials=False,      # must be False when allow_origins=["*"]
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(tenders_router)
 
 @app.on_event("startup")
@@ -31,4 +34,4 @@ async def shutdown():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "0.2.0"}
