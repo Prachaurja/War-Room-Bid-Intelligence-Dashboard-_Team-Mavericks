@@ -7,7 +7,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
-    title="War Room - Bid Intelligence Intelligence Dashboard",
+    title="Prompcorp's War Room - Bid Intelligence Dashboard",
     version="0.1.0",
 )
 
