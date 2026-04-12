@@ -2,29 +2,62 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import { Target, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/auth.store';
 import styles from './LoginPage.module.css';
 
 export default function LoginPage() {
-  const { login } = useAuth();
-  const [email, setEmail]         = useState('');
-  const [password, setPassword]   = useState('');
-  const [showPass, setShowPass]   = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
+  const [email,      setEmail]    = useState('');
+  const [password,   setPassword] = useState('');
+  const [showPass,   setShowPass] = useState(false);
+  const [rememberMe, setRemember] = useState(false);
+  const [loading,    setLoading]  = useState(false);
+  const [error,      setError]    = useState('');
+  const { setAuth }               = useAuthStore();
+  const navigate                  = useNavigate();
+
+  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const result = await login({ email, password });
-    if (!result.success) setError(result.error ?? 'Login failed');
-    setLoading(false);
+    try {
+      const formData = new URLSearchParams();
+      formData.append('username', email.trim());
+      formData.append('password', password);
+
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    formData.toString(),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(typeof data.detail === 'string' ? data.detail : 'Invalid email or password');
+        return;
+      }
+
+      if (rememberMe) {
+        const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        localStorage.setItem('wr_remember_expiry', String(expiry));
+      } else {
+        localStorage.removeItem('wr_remember_expiry');
+      }
+
+      setAuth(data.user, data.access_token);
+      navigate('/');
+    } catch {
+      setError('Cannot connect to server. Make sure the backend is running.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className={styles.page}>
-      {/* Background glow effects */}
       <div className={styles.glowPurple} />
       <div className={styles.glowBlue} />
 
@@ -36,11 +69,9 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className={styles.logoWrap}>
-          <div className={styles.logoIcon}>
-            <Target size={22} />
-          </div>
+          <div className={styles.logoIcon}><Target size={22} /></div>
           <div>
-            <h1 className={styles.logoName}>Prompcorp's War Room</h1>
+            <h1 className={styles.logoName}>War Room</h1>
             <p className={styles.logoSub}>Bid Intelligence Platform</p>
           </div>
         </div>
@@ -53,6 +84,7 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
+
           {/* Email */}
           <div className={styles.field}>
             <label className={styles.label}>Email Address</label>
@@ -64,15 +96,19 @@ export default function LoginPage() {
                 placeholder="you@prompcorp.com.au"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                required
-                autoFocus
+                required autoFocus disabled={loading}
               />
             </div>
           </div>
 
           {/* Password */}
           <div className={styles.field}>
-            <label className={styles.label}>Password</label>
+            <div className={styles.passwordLabelRow}>
+              <label className={styles.label}>Password</label>
+              <Link to="/forgot-password" className={styles.forgotLink}>
+                Forgot Password?
+              </Link>
+            </div>
             <div className={styles.inputWrap}>
               <Lock size={15} className={styles.inputIcon} />
               <input
@@ -81,7 +117,7 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                required
+                required disabled={loading}
               />
               <button
                 type="button"
@@ -93,6 +129,28 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Remember Me */}
+          <div className={styles.rememberRow}>
+            <div
+              className={`${styles.checkbox} ${rememberMe ? styles.checkboxChecked : ''}`}
+              onClick={() => setRemember(v => !v)}
+              role="checkbox"
+              aria-checked={rememberMe}
+              tabIndex={0}
+              onKeyDown={e => e.key === ' ' && setRemember(v => !v)}
+            >
+              {rememberMe && (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8"
+                    strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+            <span className={styles.rememberText} onClick={() => setRemember(v => !v)}>
+              Remember me for 30 days
+            </span>
+          </div>
+
           {/* Error */}
           {error && (
             <motion.div
@@ -100,28 +158,25 @@ export default function LoginPage() {
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <AlertCircle size={14} />
-              {error}
+              <AlertCircle size={14} /> {error}
             </motion.div>
           )}
 
           {/* Submit */}
-          <button
-            type="submit"
-            className={styles.submitBtn}
-            disabled={loading}
-          >
-            {loading ? (
-              <span className={styles.spinner} />
-            ) : (
-              "Sign in to War Room Dashboard"
-            )}
+          <button type="submit" className={styles.submitBtn} disabled={loading}>
+            {loading ? <span className={styles.spinner} /> : 'Sign in to War Room'}
           </button>
+
         </form>
 
-        <p className={styles.hint}>
-          Demo: Enter any email and password to access the dashboard
-        </p>
+        {/* Bottom — separated by border */}
+        <div className={styles.bottomLinks}>
+          <p className={styles.registerLink}>
+            Don't have an account?{' '}
+            <Link to="/register" className={styles.link}>Create an Account</Link>
+          </p>
+        </div>
+
       </motion.div>
     </div>
   );
