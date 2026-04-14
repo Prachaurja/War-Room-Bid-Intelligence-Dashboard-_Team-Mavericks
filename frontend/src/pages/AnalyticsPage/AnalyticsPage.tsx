@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion';
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
+  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Download, Filter, TrendingUp, BarChart3, PieChart as PieIcon, Activity } from 'lucide-react';
+import { Download, Filter, TrendingUp, BarChart3, PieChart as PieIcon, Activity, Building2 } from 'lucide-react';
 import { useSectorStats, useStateStats, useOverviewStats } from '../../hooks/useTenders';
+import { useMonthlyVolume, useValueOverTime, useTopDepartments } from '../../hooks/useAnalytics';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { sectorLabel, sectorColor } from '../../utils/tender.utils';
 import styles from './AnalyticsPage.module.css';
@@ -17,6 +18,11 @@ const STATE_COLORS: Record<string, string> = {
   SA:  '#10B981', WA:  '#EC4899', ACT: '#06B6D4',
   NT:  '#EF4444', TAS: '#84CC16', Federal: '#6B7280',
 };
+
+const DEPT_COLORS = [
+  '#7C3AED','#3B82F6','#10B981','#F59E0B',
+  '#EC4899','#06B6D4','#EF4444','#84CC16','#8B5CF6','#F97316',
+];
 
 // ── Tooltip components ────────────────────────────────────────
 type TooltipEntry = { color: string; name: string; value: number };
@@ -56,9 +62,15 @@ const PieTooltip = ({ active, payload }: { active?: boolean; payload?: PieEntry[
 export default function AnalyticsPage() {
   const [activeMetric, setActiveMetric] = useState<'count' | 'value'>('count');
 
-  const { data: sectorData, isLoading: sectorLoading } = useSectorStats();
-  const { data: stateData,  isLoading: stateLoading  } = useStateStats();
-  const { data: overview,   isLoading: overviewLoading } = useOverviewStats();
+  // ── Existing hooks ────────────────────────────────────────
+  const { data: sectorData,  isLoading: sectorLoading  } = useSectorStats();
+  const { data: stateData,   isLoading: stateLoading   } = useStateStats();
+  const { data: overview,    isLoading: overviewLoading } = useOverviewStats();
+
+  // ── New analytics hooks ───────────────────────────────────
+  const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyVolume();
+  const { data: valueData,   isLoading: valueLoading   } = useValueOverTime();
+  const { data: deptData,    isLoading: deptLoading    } = useTopDepartments(10);
 
   // ── Derived chart data ────────────────────────────────────
   const sectorChartData = (sectorData ?? [])
@@ -83,12 +95,12 @@ export default function AnalyticsPage() {
       fill:        STATE_COLORS[d.state] ?? '#6B7280',
     }));
 
-  // ── Top performers table ──────────────────────────────────
   const topSectors = [...sectorChartData]
     .sort((a, b) => b.total_value - a.total_value)
     .slice(0, 6);
 
-  const maxValue = topSectors[0]?.total_value ?? 1;
+  const maxValue    = topSectors[0]?.total_value ?? 1;
+  const maxDeptVal  = (deptData ?? [])[0]?.total_value ?? 1;
 
   // ── KPI cards ─────────────────────────────────────────────
   const kpis = [
@@ -134,12 +146,8 @@ export default function AnalyticsPage() {
           <p className={styles.headingSub}>Deep Dive Analytics into Australian Government Procurement Data</p>
         </div>
         <div className={styles.headerActions}>
-          <button className={styles.ghostBtn}>
-            <Filter size={13} /> Filter
-          </button>
-          <button className={styles.ghostBtn}>
-            <Download size={13} /> Export
-          </button>
+          <button className={styles.ghostBtn}><Filter size={13} /> Filter</button>
+          <button className={styles.ghostBtn}><Download size={13} /> Export</button>
         </div>
       </div>
 
@@ -191,10 +199,8 @@ export default function AnalyticsPage() {
                     data={sectorChartData}
                     dataKey="count"
                     nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
+                    cx="50%" cy="50%"
+                    innerRadius={60} outerRadius={100}
                     paddingAngle={3}
                   >
                     {sectorChartData.map((entry) => (
@@ -204,7 +210,6 @@ export default function AnalyticsPage() {
                   <Tooltip content={<PieTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
-              {/* Legend */}
               <div className={styles.pieLegend}>
                 {sectorChartData.map(d => (
                   <div key={d.name} className={styles.legendItem}>
@@ -250,8 +255,7 @@ export default function AnalyticsPage() {
                 <Bar
                   dataKey={activeMetric === 'count' ? 'count' : 'total_value'}
                   name={activeMetric === 'count' ? 'Contracts' : 'Value'}
-                  radius={[5, 5, 0, 0]}
-                  maxBarSize={36}
+                  radius={[5, 5, 0, 0]} maxBarSize={36}
                 >
                   {stateChartData.map(entry => (
                     <Cell key={entry.state} fill={entry.fill} />
@@ -300,10 +304,7 @@ export default function AnalyticsPage() {
                     {sector.label}
                   </div>
                   <div className={styles.topBarWrap}>
-                    <div
-                      className={styles.topBar}
-                      style={{ width: `${pct}%`, background: sector.fill }}
-                    />
+                    <div className={styles.topBar} style={{ width: `${pct}%`, background: sector.fill }} />
                   </div>
                   <div className={styles.topMeta}>
                     <span className={styles.topValue}>{formatCurrency(sector.total_value)}</span>
@@ -316,7 +317,7 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* ── Row 3: Sector horizontal bar (full width) ── */}
+      {/* ── Row 3: Sector horizontal bar ── */}
       <div className={styles.chartCard}>
         <div className={styles.chartHeader}>
           <div>
@@ -336,12 +337,9 @@ export default function AnalyticsPage() {
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.04)" />
               <XAxis type="number" tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis
-                dataKey="label"
-                type="category"
+                dataKey="label" type="category"
                 tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
-                axisLine={false}
-                tickLine={false}
-                width={98}
+                axisLine={false} tickLine={false} width={98}
               />
               <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
               <Bar dataKey="count" name="Contracts" radius={[0, 5, 5, 0]} maxBarSize={18}>
@@ -351,6 +349,123 @@ export default function AnalyticsPage() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* ── NEW Row 4: Monthly volume bar + Value over time line ── */}
+      <div className={styles.chartsRow2}>
+
+        {/* Monthly Volume Bar */}
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <div>
+              <h3 className={styles.chartTitle}>Monthly Contract Volume</h3>
+              <p className={styles.chartSub}>Number of Contracts Ingested Per Month</p>
+            </div>
+            <div className={styles.pill}>
+              {(monthlyData ?? []).reduce((s, d) => s + d.count, 0)} total
+            </div>
+          </div>
+          {monthlyLoading ? (
+            <div className={clsx(styles.shimmer)} style={{ height: 240 }} />
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={monthlyData ?? []} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                <Bar dataKey="count" name="Contracts" fill="#7C3AED" radius={[5, 5, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Value Over Time Line */}
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <div>
+              <h3 className={styles.chartTitle}>Contract Value Over Time</h3>
+              <p className={styles.chartSub}>Total Contract Value Ingested Per Month</p>
+            </div>
+            <div className={styles.pill}>AUD</div>
+          </div>
+          {valueLoading ? (
+            <div className={clsx(styles.shimmer)} style={{ height: 240 }} />
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={valueData ?? []} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={48}
+                  tickFormatter={(v: number) => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(1)}M` : `$${(v/1000).toFixed(0)}K`}
+                />
+                <Tooltip content={<DarkTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="total_value"
+                  name="Total Value"
+                  stroke="#3B82F6"
+                  strokeWidth={2.5}
+                  dot={{ fill: '#3B82F6', r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* ── NEW Row 5: Top Departments by spend ── */}
+      <div className={styles.chartCard}>
+        <div className={styles.chartHeader}>
+          <div>
+            <h3 className={styles.chartTitle}>Top Departments by Spend</h3>
+            <p className={styles.chartSub}>Top 10 Government Agencies Ranked by Total Contract Value</p>
+          </div>
+          <div className={styles.pill}>
+            <Building2 size={11} /> Top 10
+          </div>
+        </div>
+        {deptLoading ? (
+          <div className={styles.loadingTable}>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className={styles.tableSkeletonRow}>
+                <div className={clsx(styles.shimmer)} style={{ width: 120, height: 11 }} />
+                <div className={clsx(styles.shimmer)} style={{ flex: 1, height: 8 }} />
+                <div className={clsx(styles.shimmer)} style={{ width: 80, height: 11 }} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.topTable}>
+            {(deptData ?? []).map((dept, i) => {
+              const pct = (dept.total_value / maxDeptVal) * 100;
+              const color = DEPT_COLORS[i % DEPT_COLORS.length];
+              return (
+                <motion.div
+                  key={dept.agency}
+                  className={styles.topRow}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0  }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <div className={styles.topRank}>#{i + 1}</div>
+                  <div className={styles.topSectorLabel}>
+                    <span className={styles.topDot} style={{ background: color }} />
+                    <span className={styles.deptName}>{dept.agency}</span>
+                  </div>
+                  <div className={styles.topBarWrap}>
+                    <div className={styles.topBar} style={{ width: `${pct}%`, background: color }} />
+                  </div>
+                  <div className={styles.topMeta}>
+                    <span className={styles.topValue}>{formatCurrency(dept.total_value)}</span>
+                    <span className={styles.topCount}>{formatNumber(dept.contract_count)} contracts</span>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         )}
       </div>
 
