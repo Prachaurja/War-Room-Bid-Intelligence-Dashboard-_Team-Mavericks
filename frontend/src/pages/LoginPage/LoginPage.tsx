@@ -79,7 +79,7 @@ export default function LoginPage() {
         <div className={styles.divider} />
 
         <div className={styles.header}>
-          <h2 className={styles.title}>Sign in</h2>
+          <h2 className={styles.title}>Sign In</h2>
           <p className={styles.subtitle}>Access Your Intelligence Dashboard</p>
         </div>
 
