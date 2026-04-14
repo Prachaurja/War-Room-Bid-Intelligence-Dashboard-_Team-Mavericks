@@ -54,3 +54,24 @@ async def me(current_user=Depends(get_current_user)):
 @router.post("/logout")
 async def logout():
     return {"message": "Logged Out Successfully"}
+
+# ── POST /auth/forgot-password ────────────────────────────────
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+@router.post("/forgot-password")
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Always returns success — never reveals if email exists.
+    In production this would send a real reset email.
+    For now it logs the request and returns success.
+    """
+    from app.services.auth_service import get_user_by_email
+    user = await get_user_by_email(db, body.email)
+    if user:
+        logger.info(f"Password reset requested for: {body.email}")
+        # TODO Phase 3: send real reset email via SMTP
+    return {"message": "If that email exists, a reset link has been sent"}
