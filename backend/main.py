@@ -3,6 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.ingestion.scheduler import start_scheduler, stop_scheduler
 from app.routers.tenders_router import router as tenders_router
 from app.routers.auth_router import router as auth_router
+from app.routers.analytics_router import router as analytics_router
+from app.routers.alerts_router import router as alerts_router
+from app.routers.reports_router import router as reports_router
+from app.routers.ws_router import router as ws_router
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -10,9 +14,10 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(
     title="Prompcorp's War Room — Bid Intelligence Dashboard",
     description="Aggregates Australian Government Tender Data for Prompcorp",
-    version="0.2.0",
+    version="0.6.0",
 )
 
+# ── CORS ──────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,9 +26,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Routers ───────────────────────────────────────────────────
 app.include_router(auth_router)
 app.include_router(tenders_router)
+app.include_router(analytics_router)
+app.include_router(alerts_router)
+app.include_router(reports_router)
+app.include_router(ws_router)
 
+# ── Lifecycle ─────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
     start_scheduler()
@@ -32,6 +43,7 @@ async def startup():
 async def shutdown():
     stop_scheduler()
 
+# ── Health ────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "0.2.0"}
+    return {"status": "ok", "version": "0.6.0"}
