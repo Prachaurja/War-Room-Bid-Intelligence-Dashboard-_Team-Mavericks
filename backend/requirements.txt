@@ -36,3 +36,4 @@ typing_extensions==4.15.0
 tzlocal==5.3.1
 uvicorn==0.43.0
 xlrd==2.0.2
+redis
