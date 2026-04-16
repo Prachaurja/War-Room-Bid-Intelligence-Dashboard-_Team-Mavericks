@@ -5,6 +5,8 @@ from app.ingestion.clients.nsw_etender_client import NSWeTenderClient
 from app.ingestion.normaliser import normalise
 from app.ingestion.deduplicator import bulk_upsert
 from app.ingestion.alert_matcher import run_alert_matcher
+from app.routers.ws_router import manager as ws_manager
+from app.core.cache import invalidate_stats_cache
 from app.core.database import AsyncSessionLocal
 import logging
 
@@ -13,7 +15,7 @@ scheduler = AsyncIOScheduler()
 
 
 async def run_ingestion():
-    """Main ingestion job. Runs every 30 minutes."""
+    """Main Ingestion Job. Runs Every 30 Minutes."""
     logger.info("=== Ingestion Job Started ===")
 
     clients = [AusTenderClient(), NSWeTenderClient()]
@@ -39,12 +41,12 @@ async def run_ingestion():
 
     if all_normalised:
         async with AsyncSessionLocal() as db:
-            # Step 1 — save tenders, get back new IDs
+            # Step 1 — save tenders
             summary = await bulk_upsert(db, all_normalised)
             logger.info(
-                f"DB Result: {summary['inserted']} Inserted, "
-                f"{summary['updated']} Updated, "
-                f"{summary['skipped']} Skipped"
+                f"DB result: {summary['inserted']} inserted, "
+                f"{summary['updated']} updated, "
+                f"{summary['skipped']} skipped"
             )
 
             # Step 2 — match new tenders against saved searches
@@ -56,13 +58,19 @@ async def run_ingestion():
             else:
                 logger.info("No New Tenders — Skipping Alert Matcher")
 
-    # Step 3 — broadcast to all connected WebSocket clients
+    # Step 3 — invalidate Redis cache so fresh data loads immediately
     try:
-        from app.routers.ws_router import manager
-        await manager.broadcast({
-            "type":          "ingestion_complete",
-            "new_tenders":   len(new_ids),
-            "new_alerts":    alerts_count,
+        await invalidate_stats_cache()
+        logger.info("Cache Invalidated After Ingestion")
+    except Exception as e:
+        logger.error(f"Cache Invalidation Failed: {e}")
+
+    # Step 4 — broadcast to all connected WebSocket clients
+    try:
+        await ws_manager.broadcast({
+            "type":           "ingestion_complete",
+            "new_tenders":    len(new_ids),
+            "new_alerts":     alerts_count,
             "total_ingested": len(all_normalised),
         })
     except Exception as e:
@@ -76,11 +84,11 @@ def start_scheduler():
         run_ingestion,
         trigger=IntervalTrigger(minutes=30),
         id="tender_ingestion",
-        name="Fetch Tenders from All Sources",
+        name="Fetch Tenders From All Sources",
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("Scheduler Started - Ingestion Runs Every 30 Minutes")
+    logger.info("Scheduler Started — Ingestion Runs Every 30 Minutes")
 
 
 def stop_scheduler():
