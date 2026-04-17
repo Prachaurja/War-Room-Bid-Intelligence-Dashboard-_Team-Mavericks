@@ -1,7 +1,7 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from app.ingestion.clients.austender_client import AusTenderClient
-from app.ingestion.clients.nsw_etender_client import NSWeTenderClient
+from app.ingestion.clients.qld_client import QLDTendersClient
 from app.ingestion.normaliser import normalise
 from app.ingestion.deduplicator import bulk_upsert
 from app.ingestion.alert_matcher import run_alert_matcher
@@ -15,68 +15,76 @@ scheduler = AsyncIOScheduler()
 
 
 async def run_ingestion():
-    """Main Ingestion Job. Runs Every 30 Minutes."""
-    logger.info("=== Ingestion Job Started ===")
+    """
+    Main ingestion job — runs every 30 minutes.
+    Sources:
+      - AusTenderClient  → Federal closed contracts
+      - QLDTendersClient → QLD closed contracts + upcoming pipeline
+    """
+    logger.info("=== Ingestion job started ===")
 
-    clients = [AusTenderClient(), NSWeTenderClient()]
+    clients = [AusTenderClient(), QLDTendersClient()]  # list of clients to fetch data from
+
     all_normalised = []
 
     for client in clients:
         try:
             raw_records = await client.fetch()
-            logger.info(f"{client.SOURCE_NAME}: Fetched {len(raw_records)} Raw Records")
+            logger.info(f"{client.SOURCE_NAME}: fetched {len(raw_records)} raw records")
             for raw in raw_records:
                 normalised = normalise(client.SOURCE_NAME, raw)
                 if normalised:
                     all_normalised.append(normalised)
         except Exception as e:
-            logger.error(f"Client {client.SOURCE_NAME} Failed: {e}", exc_info=True)
+            logger.error(f"Client {client.SOURCE_NAME} failed: {e}", exc_info=True)
         finally:
             await client.close()
 
-    logger.info(f"Total Ready to Save: {len(all_normalised)} Normalised Records")
+    by_status = {}
+    for r in all_normalised:
+        s = r.get("status", "unknown")
+        by_status[s] = by_status.get(s, 0) + 1
+
+    logger.info(f"Total normalised: {len(all_normalised)} — {by_status}")
 
     new_ids      = []
     alerts_count = 0
 
     if all_normalised:
         async with AsyncSessionLocal() as db:
-            # Step 1 — save tenders
             summary = await bulk_upsert(db, all_normalised)
             logger.info(
-                f"DB result: {summary['inserted']} inserted, "
+                f"DB: {summary['inserted']} inserted, "
                 f"{summary['updated']} updated, "
                 f"{summary['skipped']} skipped"
             )
 
-            # Step 2 — match new tenders against saved searches
             new_ids = summary.get("new_ids", [])
             if new_ids:
-                logger.info(f"Running Alert Matcher for {len(new_ids)} New Tenders...")
+                logger.info(f"Alert matcher: {len(new_ids)} new tenders...")
                 alerts_count = await run_alert_matcher(db, new_ids)
-                logger.info(f"Alert Matcher Created {alerts_count} Alert(s)")
+                logger.info(f"Alert matcher: {alerts_count} alert(s) created")
             else:
-                logger.info("No New Tenders — Skipping Alert Matcher")
+                logger.info("No new tenders — skipping alert matcher")
 
-    # Step 3 — invalidate Redis cache so fresh data loads immediately
     try:
         await invalidate_stats_cache()
-        logger.info("Cache Invalidated After Ingestion")
+        logger.info("Cache invalidated")
     except Exception as e:
-        logger.error(f"Cache Invalidation Failed: {e}")
+        logger.error(f"Cache invalidation failed: {e}")
 
-    # Step 4 — broadcast to all connected WebSocket clients
     try:
         await ws_manager.broadcast({
             "type":           "ingestion_complete",
             "new_tenders":    len(new_ids),
             "new_alerts":     alerts_count,
             "total_ingested": len(all_normalised),
+            "by_status":      by_status,
         })
     except Exception as e:
-        logger.error(f"WebSocket Broadcast Failed: {e}")
+        logger.error(f"WS broadcast failed: {e}")
 
-    logger.info("=== Ingestion Job Complete ===")
+    logger.info("=== Ingestion job complete ===")
 
 
 def start_scheduler():
@@ -84,11 +92,11 @@ def start_scheduler():
         run_ingestion,
         trigger=IntervalTrigger(minutes=30),
         id="tender_ingestion",
-        name="Fetch Tenders From All Sources",
+        name="Fetch tenders from all sources",
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("Scheduler Started — Ingestion Runs Every 30 Minutes")
+    logger.info("Scheduler started — ingestion runs every 30 minutes")
 
 
 def stop_scheduler():
