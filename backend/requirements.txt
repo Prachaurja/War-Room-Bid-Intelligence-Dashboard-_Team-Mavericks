@@ -37,3 +37,7 @@ tzlocal==5.3.1
 uvicorn==0.43.0
 xlrd==2.0.2
 redis
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.0.1
+python-multipart
