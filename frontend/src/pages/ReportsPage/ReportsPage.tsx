@@ -27,7 +27,7 @@ interface Report {
 }
 
 const REPORTS: Report[] = [
-  { id:'RPT-001', title:'AusTender GaPS — Full Export',          description:'Complete Dataset of All Ingested Contracts from the Government Contracts Publishing System', type:'source',   status:'completed',  generated: new Date(Date.now()-2*3600000).toISOString(),  size:'4.2 MB', records:500 },
+  { id:'RPT-001', title:'AusTender GaPS & Queensland Tenders — Full Export',          description:'Complete Dataset of All Ingested Contracts from the Government Contracts Publishing System', type:'source',   status:'completed',  generated: new Date(Date.now()-2*3600000).toISOString(),  size:'4.2 MB', records:500 },
   { id:'RPT-002', title:'Sector Breakdown Report',               description:'Contract Volume and Value Analysis Across All Procurement Sectors',                          type:'sector',   status:'completed',  generated: new Date(Date.now()-6*3600000).toISOString(),  size:'1.1 MB', records:7   },
   { id:'RPT-003', title:'Regional Distribution Analysis',        description:'State-by-State Contract Distribution with Total Awarded Values',                            type:'regional', status:'completed',  generated: new Date(Date.now()-24*3600000).toISOString(), size:'0.8 MB', records:9   },
   { id:'RPT-004', title:'High-Value Contracts Report',           description:'Contracts Above $1M Sorted by Awarded Value — Top Procurement Opportunities',               type:'value',    status:'completed',  generated: new Date().toISOString(),                      size:'2.1 MB', records:0   },
