@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -161,7 +162,8 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
 
 // ── Main page ─────────────────────────────────────────────────
 export default function AlertsPage() {
-  const [search,         setSearch]         = useState('');
+  const [searchParams, setSearchParams]     = useSearchParams();
+  const [search,         setSearch]         = useState(searchParams.get('search') ?? '');
   const [typeFilter,     setTypeFilter]     = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
@@ -181,6 +183,20 @@ export default function AlertsPage() {
   const searches = useMemo(() => searchesData ?? [], [searchesData]);
 
   const unreadCount = alerts.filter(a => !a.read).length;
+
+  useEffect(() => {
+    const nextSearch = searchParams.get('search') ?? '';
+    if (nextSearch !== search) {
+      setSearch(nextSearch);
+    }
+  }, [searchParams, search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (search.trim()) params.set('search', search.trim());
+    else params.delete('search');
+    setSearchParams(params, { replace: true });
+  }, [search, searchParams, setSearchParams]);
 
   // ── Filter alerts ─────────────────────────────────────────
   const filtered = useMemo(() => alerts.filter(a => {

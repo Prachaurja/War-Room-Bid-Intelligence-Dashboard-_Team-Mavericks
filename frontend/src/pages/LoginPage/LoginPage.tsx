@@ -71,7 +71,7 @@ export default function LoginPage() {
         <div className={styles.logoWrap}>
           <div className={styles.logoIcon}><Target size={22} /></div>
           <div>
-            <h1 className={styles.logoName}>War Room</h1>
+          <h1 className={styles.logoName}>War Room</h1>
             <p className={styles.logoSub}>Bid Intelligence Platform</p>
           </div>
         </div>
@@ -164,7 +164,7 @@ export default function LoginPage() {
 
           {/* Submit */}
           <button type="submit" className={styles.submitBtn} disabled={loading}>
-            {loading ? <span className={styles.spinner} /> : 'Sign in to War Room'}
+              {loading ? <span className={styles.spinner} /> : 'Sign in to War Room'}
           </button>
 
         </form>

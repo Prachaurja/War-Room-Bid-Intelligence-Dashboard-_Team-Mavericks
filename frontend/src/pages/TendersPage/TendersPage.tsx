@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import {
   Download, AlertCircle, Clock,
   CheckCircle2, Layers, DollarSign,
@@ -24,8 +25,9 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 export default function TendersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab]         = useState<Tab>('closed');
-  const [search, setSearch]               = useState('');
+  const [search, setSearch]               = useState(searchParams.get('search') ?? '');
   const [sector, setSector]               = useState('');
   const [state, setState]                 = useState('');
   const [page, setPage]                   = useState(1);
@@ -42,6 +44,21 @@ export default function TendersPage() {
   const handleClear = useCallback(() => {
     setSearch(''); setSector(''); setState(''); setPage(1);
   }, []);
+
+  useEffect(() => {
+    const nextSearch = searchParams.get('search') ?? '';
+    if (nextSearch !== search) {
+      setSearch(nextSearch);
+      setPage(1);
+    }
+  }, [searchParams, search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (search.trim()) params.set('search', search.trim());
+    else params.delete('search');
+    setSearchParams(params, { replace: true });
+  }, [search, searchParams, setSearchParams]);
 
   const filters = {
     page,
