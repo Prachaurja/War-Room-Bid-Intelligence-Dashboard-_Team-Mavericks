@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell, Plus, Search, X, Trash2, Check,
@@ -61,7 +62,7 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
-  return (
+  const modal = (
     <motion.div
       className={styles.overlay}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -154,6 +155,8 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
       </motion.div>
     </motion.div>
   );
+
+  return createPortal(modal, document.body);
 }
 
 // ── Main page ─────────────────────────────────────────────────

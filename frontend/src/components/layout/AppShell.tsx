@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { useUIStore } from '../../store/ui.store';
-import Sidebar from './Sidebar'; 
+import Sidebar from './SideBar'; 
 import TopBar from './TopBar'; 
 import styles from './AppShell.module.css';
 

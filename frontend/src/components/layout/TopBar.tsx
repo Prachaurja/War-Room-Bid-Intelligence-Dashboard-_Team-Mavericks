@@ -1,4 +1,4 @@
-import { Menu, Bell, Search, RefreshCw } from 'lucide-react';
+import { Menu, Bell, Search, RefreshCw, Moon, Sun, Monitor } from 'lucide-react';
 import { useUIStore } from '../../store/ui.store';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -18,7 +18,7 @@ interface TopBarProps {
 }
 
 export default function TopBar({ pathname }: TopBarProps) {
-  const { toggleSidebar } = useUIStore();
+  const { toggleSidebar, themeMode, resolvedTheme, cycleThemeMode } = useUIStore();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const pageInfo = PAGE_TITLES[pathname] ?? PAGE_TITLES['/'];
@@ -32,6 +32,14 @@ export default function TopBar({ pathname }: TopBarProps) {
     await queryClient.invalidateQueries();
     setTimeout(() => setRefreshing(false), 600);
   };
+
+  const themeConfig = {
+    system: { label: 'System', icon: Monitor },
+    dark: { label: 'Dark', icon: Moon },
+    light: { label: 'Light', icon: Sun },
+  }[themeMode];
+
+  const ThemeIcon = themeConfig.icon;
 
   return (
     <header className={styles.topbar}>
@@ -48,6 +56,15 @@ export default function TopBar({ pathname }: TopBarProps) {
 
       {/* Right */}
       <div className={styles.right}>
+        <button
+          className={styles.themeBtn}
+          onClick={cycleThemeMode}
+          title={`Theme mode: ${themeConfig.label} (${resolvedTheme})`}
+          aria-label={`Theme mode: ${themeConfig.label}. Click to switch theme mode.`}
+        >
+          <ThemeIcon size={15} />
+          <span className={styles.themeLabel}>{themeConfig.label}</span>
+        </button>
         <button
           className={styles.iconBtn}
           onClick={handleRefresh}

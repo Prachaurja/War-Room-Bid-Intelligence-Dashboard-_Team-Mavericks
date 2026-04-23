@@ -10,7 +10,7 @@ import { useUIStore } from '../../store/ui.store';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useAlerts } from '../../hooks/useAlerts';
 import clsx from 'clsx';
-import styles from './Sidebar.module.css';
+import styles from './SideBar.module.css';
 
 export default function Sidebar() {
   const { user, logout }                        = useAuth();
