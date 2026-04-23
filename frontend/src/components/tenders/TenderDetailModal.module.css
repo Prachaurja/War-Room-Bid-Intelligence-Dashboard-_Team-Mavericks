@@ -1,24 +1,27 @@
 .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
-    z-index: 200;
+    background:
+      var(--modal-veil),
+      var(--modal-overlay);
+    backdrop-filter: blur(12px) saturate(1.05);
+    -webkit-backdrop-filter: blur(12px) saturate(1.05);
+    z-index: 260;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: 28px;
   }
   
   .modal {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-hover);
+    background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+    border: 1px solid var(--modal-border);
     border-radius: var(--radius-xl);
     width: 100%;
-    max-width: 680px;
-    max-height: 90vh;
+    max-width: 760px;
+    max-height: min(88vh, 920px);
     overflow-y: auto;
-    box-shadow: var(--shadow-lg), 0 0 60px rgba(124,58,237,0.12);
+    box-shadow: var(--modal-shadow), 0 0 60px var(--accent-dim);
   }
   
   /* Header */
@@ -88,6 +91,7 @@
     background: var(--bg-elevated);
     margin: 16px 24px 0;
     border-radius: var(--radius-md);
+    border: 1px solid var(--border);
   }
   
   .descLabel {
@@ -245,7 +249,17 @@
   .bidBtn:hover { opacity: 0.9; transform: translateY(-1px); }
   
   @media (max-width: 600px) {
+    .overlay { padding: 14px; align-items: flex-end; }
+    .modal { max-height: 92vh; border-radius: 18px 18px 0 0; }
+    .header, .titleSection, .detailsGrid, .footerActions { padding-left: 18px; padding-right: 18px; }
+    .descSection, .valueBanner { margin-left: 18px; margin-right: 18px; }
+    .titleSection { flex-direction: column; }
+    .footerActions { flex-wrap: wrap; }
+    .bidBtn { margin-left: 0; width: 100%; justify-content: center; }
+    .primaryBtn, .cancelBtn { flex: 1; justify-content: center; }
     .detailsGrid { grid-template-columns: 1fr; }
     .detailsCol:first-child { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
     .detailsCol:last-child { padding-left: 0; padding-top: 16px; }
+    .valueBanner { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .valueBannerAmount { font-size: 20px; }
   }

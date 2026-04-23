@@ -202,7 +202,7 @@ export default function Sidebar() {
               <Target size={18} />
             </div>
             <div className={styles.logoText}>
-              <span className={styles.logoName}>Tendora</span>
+              <span className={styles.logoName}>War Room</span>
               <span className={styles.logoSub}>Bid Intelligence</span>
             </div>
 
