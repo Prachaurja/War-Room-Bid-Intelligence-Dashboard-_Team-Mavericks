@@ -1,19 +1,27 @@
 import { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell, Plus, Search, X, Trash2, Check,
   CheckCheck, AlertCircle, TrendingUp, FileText,
-  Info, Filter, Mail, MessageSquare, Smartphone,
+  Info, Building2, Mail, MessageSquare, Smartphone,
   Target, Clock, MapPin, DollarSign, Save,
+  ChevronLeft, ChevronRight, BarChart2, Activity,
 } from 'lucide-react';
 import { formatAgo } from '../../utils/formatters';
+import { loadPref, savePref } from '../../utils/storage';
 import {
   useAlerts, useMarkRead, useMarkAllRead,
   useDeleteAlert, useSavedSearches, useCreateSavedSearch,
   useDeleteSavedSearch, useToggleSavedSearch,
+  type AlertItem, type SavedSearchItem,
 } from '../../hooks/useAlerts';
 import styles from './AlertsPage.module.css';
 import clsx from 'clsx';
+
+// ── Constants ─────────────────────────────────────────────────
+const PAGE_SIZE = 10;
 
 // ── Types ─────────────────────────────────────────────────────
 type AlertPriority = 'high' | 'medium' | 'low';
@@ -40,6 +48,230 @@ const SECTOR_LABELS: Record<string, string> = {
   other: 'Other', '': 'All Sectors',
 };
 
+// ── Pagination component ──────────────────────────────────────
+interface PaginationProps {
+  page:       number;
+  totalPages: number;
+  total:      number;
+  pageSize:   number;
+  onChange:   (p: number) => void;
+}
+
+function Pagination({ page, totalPages, total, pageSize, onChange }: PaginationProps) {
+  if (totalPages <= 1) return null;
+
+  const from = (page - 1) * pageSize + 1;
+  const to   = Math.min(page * pageSize, total);
+
+  const pages: (number | '…')[] = [];
+  const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
+
+  add(1);
+  if (page - 2 > 2)                  pages.push('…');
+  if (page - 1 > 1)                  add(page - 1);
+  if (page > 1 && page < totalPages) add(page);
+  if (page + 1 < totalPages)         add(page + 1);
+  if (page + 2 < totalPages - 1)     pages.push('…');
+  add(totalPages);
+
+  return (
+    <div className={styles.pagination}>
+      <span className={styles.paginationInfo}>
+        {from}–{to} of {total} alert{total !== 1 ? 's' : ''}
+      </span>
+      <div className={styles.paginationControls}>
+        <button
+          className={styles.pageBtn}
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+          aria-label="Previous page"
+        >
+          <ChevronLeft size={14} />
+        </button>
+
+        {pages.map((p, i) =>
+          p === '…' ? (
+            <span key={`ellipsis-${i}`} className={styles.pageEllipsis}>…</span>
+          ) : (
+            <button
+              key={p}
+              className={clsx(styles.pageBtn, p === page && styles.pageBtnActive)}
+              onClick={() => onChange(p)}
+              aria-label={`Page ${p}`}
+              aria-current={p === page ? 'page' : undefined}
+            >
+              {p}
+            </button>
+          )
+        )}
+
+        <button
+          className={styles.pageBtn}
+          onClick={() => onChange(page + 1)}
+          disabled={page === totalPages}
+          aria-label="Next page"
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Alert Activity Summary card ───────────────────────────────
+function AlertActivitySummary({ alerts }: { alerts: AlertItem[] }) {
+  const types: { key: AlertType; label: string; color: string; bg: string }[] = [
+    { key: 'tender', label: 'Tender', color: '#7C3AED', bg: 'rgba(124,58,237,0.12)' },
+    { key: 'bid',    label: 'Bid',    color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'  },
+    { key: 'report', label: 'Report', color: '#10B981', bg: 'rgba(16,185,129,0.12)'  },
+    { key: 'system', label: 'System', color: '#6B7280', bg: 'rgba(107,114,128,0.12)' },
+  ];
+
+  const total = alerts.length || 1;
+
+  return (
+    <div className={styles.sideCard}>
+      <div className={styles.sideCardHeader}>
+        <div>
+          <h3 className={styles.sideCardTitle}>Alert Activity</h3>
+          <p className={styles.sideCardSub}>Breakdown by Type</p>
+        </div>
+        <div className={styles.sideCardIcon}>
+          <BarChart2 size={14} />
+        </div>
+      </div>
+
+      <div className={styles.activityList}>
+        {types.map(t => {
+          const count  = alerts.filter(a => a.type === t.key).length;
+          const unread = alerts.filter(a => a.type === t.key && !a.read).length;
+          const pct    = Math.round((count / total) * 100);
+          const Icon   = TYPE_CONFIG[t.key].icon;
+          return (
+            <div key={t.key} className={styles.activityRow}>
+              <div className={styles.activityLeft}>
+                <div
+                  className={styles.activityIcon}
+                  style={{ background: t.bg, color: t.color }}
+                >
+                  <Icon size={12} />
+                </div>
+                <span className={styles.activityLabel}>{t.label}</span>
+              </div>
+
+              <div className={styles.activityRight}>
+                <div className={styles.activityBarWrap}>
+                  <div
+                    className={styles.activityBar}
+                    style={{ width: `${pct}%`, background: t.color }}
+                  />
+                </div>
+                <span className={styles.activityCount}>{count}</span>
+                {unread > 0 && (
+                  <span className={styles.activityUnread}>{unread} new</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Quick Stats card ──────────────────────────────────────────
+function QuickStats({
+  alerts,
+  searches,
+}: {
+  alerts:   AlertItem[];
+  searches: SavedSearchItem[];
+}) {
+  // Capture "now" once on mount so render stays pure (React disallows Date.now() during render)
+  const [mountedAt] = useState(() => Date.now());
+  const thisWeek = useMemo(() => {
+    const sevenDaysAgo = mountedAt - 7 * 24 * 60 * 60 * 1000;
+    return alerts.filter(a => new Date(a.created_at).getTime() > sevenDaysAgo).length;
+  }, [alerts, mountedAt]);
+
+  const readCount = alerts.filter(a => a.read).length;
+  const readRate  = alerts.length > 0
+    ? Math.round((readCount / alerts.length) * 100)
+    : 0;
+
+  const notifOn = searches.filter(s => s.notifications).length;
+
+  const typeCounts = (['tender', 'bid', 'report', 'system'] as AlertType[]).map(t => ({
+    type:  t,
+    count: alerts.filter(a => a.type === t).length,
+  }));
+  const topType      = [...typeCounts].sort((a, b) => b.count - a.count)[0];
+  const topTypeLabel = topType?.count > 0
+    ? topType.type.charAt(0).toUpperCase() + topType.type.slice(1)
+    : '—';
+  const topTypeSub   = topType?.count > 0
+    ? `${topType.count} alert${topType.count !== 1 ? 's' : ''}`
+    : 'No alerts yet';
+
+  const stats = [
+    {
+      label: 'Alerts This Week',
+      value: String(thisWeek),
+      sub:   'Last 7 Days',
+      color: '#3B82F6',
+    },
+    {
+      label: 'Read Rate',
+      value: `${readRate}%`,
+      sub:   `${readCount} of ${alerts.length} Read`,
+      color: '#10B981',
+    },
+    {
+      label: 'Top Alert Type',
+      value: topTypeLabel,
+      sub:   topTypeSub,
+      color: '#7C3AED',
+    },
+    {
+      label: 'Live Searches',
+      value: String(notifOn),
+      sub:   'Notifications On',
+      color: '#F59E0B',
+    },
+  ];
+
+  return (
+    <div className={styles.sideCard}>
+      <div className={styles.sideCardHeader}>
+        <div>
+          <h3 className={styles.sideCardTitle}>Quick Stats</h3>
+          <p className={styles.sideCardSub}>At a Glance</p>
+        </div>
+        <div className={styles.sideCardIcon}>
+          <Activity size={14} />
+        </div>
+      </div>
+
+      <div className={styles.quickStatsList}>
+        {stats.map((s, i) => (
+          <div key={i} className={styles.quickStatRow}>
+            <div className={styles.quickStatLeft}>
+              <p className={styles.quickStatLabel}>{s.label}</p>
+              <p className={styles.quickStatSub}>{s.sub}</p>
+            </div>
+            <span
+              className={styles.quickStatValue}
+              style={{ color: s.color }}
+            >
+              {s.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Create saved search modal ─────────────────────────────────
 function CreateAlertModal({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState({
@@ -58,101 +290,105 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
       max_value:     Number(form.maxValue) || 0,
       notifications: form.notifications,
     });
+    toast.success('Alert has been created');
     onClose();
   };
 
-  return (
-    <motion.div
-      className={styles.overlay}
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
+  return createPortal(
+    <AnimatePresence>
       <motion.div
-        className={styles.modal}
-        initial={{ opacity: 0, y: 24, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0,  scale: 1    }}
-        exit={{    opacity: 0, y: 16, scale: 0.97  }}
-        transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-        onClick={e => e.stopPropagation()}
+        className={styles.overlay}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
       >
-        <div className={styles.modalHeader}>
-          <div>
-            <h3 className={styles.modalTitle}>Create Saved Search</h3>
-            <p className={styles.modalSub}>Get Notified When Matching Tenders are Published</p>
-          </div>
-          <button className={styles.modalClose} onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <div className={styles.modalBody}>
-          <div className={styles.formField}>
-            <label className={styles.formLabel}>Search Name</label>
-            <input
-              className={styles.formInput}
-              placeholder="e.g. Facility Mgmt NSW $1M+"
-              value={form.name}
-              onChange={e => set('name', e.target.value)}
-            />
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formField}>
-              <label className={styles.formLabel}>Sector</label>
-              <select className={styles.formSelect} value={form.sector} onChange={e => set('sector', e.target.value)}>
-                {Object.entries(SECTOR_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.formField}>
-              <label className={styles.formLabel}>State</label>
-              <select className={styles.formSelect} value={form.state} onChange={e => set('state', e.target.value)}>
-                {['', 'NSW', 'VIC', 'QLD', 'SA', 'WA', 'ACT', 'NT', 'TAS'].map(s => (
-                  <option key={s} value={s}>{s || 'All States'}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formField}>
-              <label className={styles.formLabel}>Min Value (AUD)</label>
-              <input type="number" className={styles.formInput} placeholder="500000"
-                value={form.minValue} onChange={e => set('minValue', e.target.value)} />
-            </div>
-            <div className={styles.formField}>
-              <label className={styles.formLabel}>Max Value (AUD)</label>
-              <input type="number" className={styles.formInput} placeholder="10000000"
-                value={form.maxValue} onChange={e => set('maxValue', e.target.value)} />
-            </div>
-          </div>
-
-          <div className={styles.toggleRow}>
+        <motion.div
+          className={styles.modal}
+          initial={{ opacity: 0, y: 24, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0,  scale: 1    }}
+          exit={{    opacity: 0, y: 16, scale: 0.97  }}
+          transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className={styles.modalHeader}>
             <div>
-              <p className={styles.toggleLabel}>Enable Notifications</p>
-              <p className={styles.toggleSub}>Get Alerted When New Matches are Found</p>
+              <h3 className={styles.modalTitle}>Create Saved Search</h3>
+              <p className={styles.modalSub}>Get Notified When Matching Tenders are Published</p>
             </div>
+            <button className={styles.modalClose} onClick={onClose}><X size={16} /></button>
+          </div>
+
+          <div className={styles.modalBody}>
+            <div className={styles.formField}>
+              <label className={styles.formLabel}>Search Name</label>
+              <input
+                className={styles.formInput}
+                placeholder="e.g. Facility Mgmt NSW $1M+"
+                value={form.name}
+                onChange={e => set('name', e.target.value)}
+              />
+            </div>
+
+            <div className={styles.formRow}>
+              <div className={styles.formField}>
+                <label className={styles.formLabel}>Sector</label>
+                <select className={styles.formSelect} value={form.sector} onChange={e => set('sector', e.target.value)}>
+                  {Object.entries(SECTOR_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.formField}>
+                <label className={styles.formLabel}>State</label>
+                <select className={styles.formSelect} value={form.state} onChange={e => set('state', e.target.value)}>
+                  {['', 'NSW', 'VIC', 'QLD', 'SA', 'WA', 'ACT', 'NT', 'TAS'].map(s => (
+                    <option key={s} value={s}>{s || 'All States'}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.formRow}>
+              <div className={styles.formField}>
+                <label className={styles.formLabel}>Min Value (AUD)</label>
+                <input type="number" className={styles.formInput} placeholder="500000"
+                  value={form.minValue} onChange={e => set('minValue', e.target.value)} />
+              </div>
+              <div className={styles.formField}>
+                <label className={styles.formLabel}>Max Value (AUD)</label>
+                <input type="number" className={styles.formInput} placeholder="10000000"
+                  value={form.maxValue} onChange={e => set('maxValue', e.target.value)} />
+              </div>
+            </div>
+
+            <div className={styles.toggleRow}>
+              <div>
+                <p className={styles.toggleLabel}>Enable Notifications</p>
+                <p className={styles.toggleSub}>Get Alerted When New Matches are Found</p>
+              </div>
+              <button
+                className={clsx(styles.toggle, form.notifications && styles.toggleOn)}
+                onClick={() => set('notifications', !form.notifications)}
+              >
+                <span className={styles.toggleThumb} />
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.modalFooter}>
+            <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
             <button
-              className={clsx(styles.toggle, form.notifications && styles.toggleOn)}
-              onClick={() => set('notifications', !form.notifications)}
+              className={styles.saveBtn}
+              onClick={handleSave}
+              disabled={createSavedSearch.isPending}
             >
-              <span className={styles.toggleThumb} />
+              <Save size={13} />
+              {createSavedSearch.isPending ? 'Saving…' : 'Save Search'}
             </button>
           </div>
-        </div>
-
-        <div className={styles.modalFooter}>
-          <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-          <button
-            className={styles.saveBtn}
-            onClick={handleSave}
-            disabled={createSavedSearch.isPending}
-          >
-            <Save size={13} />
-            {createSavedSearch.isPending ? 'Saving…' : 'Save Search'}
-          </button>
-        </div>
+        </motion.div>
       </motion.div>
-    </motion.div>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
@@ -163,14 +399,25 @@ export default function AlertsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [showModal,      setShowModal]      = useState(false);
-  const [notifPrefs,     setNotifPrefs]     = useState({ email: true, sms: false, push: true });
+  const [page,           setPage]           = useState(1);
+  const [notifPrefs,     setNotifPrefs]     = useState(() =>
+    loadPref('war_room_notif_prefs', { email: true, sms: false, push: true })
+  );
+
+  const updateNotifPref = (key: 'email' | 'sms' | 'push') => {
+    setNotifPrefs(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      savePref('war_room_notif_prefs', next);
+      return next;
+    });
+  };
 
   // ── Real data hooks ───────────────────────────────────────
   const { data: alertsData,   isLoading: alertsLoading   } = useAlerts();
   const { data: searchesData, isLoading: searchesLoading } = useSavedSearches();
-  const markRead        = useMarkRead();
-  const markAllRead     = useMarkAllRead();
-  const deleteAlert     = useDeleteAlert();
+  const markRead          = useMarkRead();
+  const markAllRead       = useMarkAllRead();
+  const deleteAlert       = useDeleteAlert();
   const deleteSavedSearch = useDeleteSavedSearch();
   const toggleSavedSearch = useToggleSavedSearch();
 
@@ -180,21 +427,39 @@ export default function AlertsPage() {
   const unreadCount = alerts.filter(a => !a.read).length;
 
   // ── Filter alerts ─────────────────────────────────────────
-  const filtered = useMemo(() => alerts.filter(a => {
+  const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return (
+    return alerts.filter(a =>
       (!q || a.title.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q)) &&
       (typeFilter === 'all'     || a.type === typeFilter) &&
       (priorityFilter === 'all' || a.priority === priorityFilter) &&
       (!showUnreadOnly || !a.read)
     );
-  }), [alerts, search, typeFilter, priorityFilter, showUnreadOnly]);
+  }, [alerts, search, typeFilter, priorityFilter, showUnreadOnly]);
+
+  // Reset page to 1 whenever filters change
+  const filterKey = `${search}|${typeFilter}|${priorityFilter}|${showUnreadOnly}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  // ── Pagination derived values ─────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const handlePageChange = (p: number) => {
+    setPage(p);
+    document.getElementById('alert-list-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // ── Stat cards ────────────────────────────────────────────
   const statCards = [
-    { label: 'Unread Alerts',   value: String(unreadCount),   sub: 'Require Attention',     color: '#EF4444', bg: 'rgba(239,68,68,0.1)',    icon: AlertCircle },
-    { label: 'Active Searches', value: String(searches.length), sub: 'Monitoring Live Feeds', color: '#7C3AED', bg: 'rgba(124,58,237,0.1)', icon: Target      },
-    { label: 'Total Alerts',    value: String(alerts.length),  sub: 'All Time',              color: '#3B82F6', bg: 'rgba(59,130,246,0.1)',  icon: Bell        },
+    { label: 'Unread Alerts',   value: String(unreadCount),     sub: 'Require Attention',    color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   icon: AlertCircle },
+    { label: 'Active Searches', value: String(searches.length), sub: 'Monitoring Live Feeds', color: '#7C3AED', bg: 'rgba(124,58,237,0.1)',  icon: Target      },
+    { label: 'Total Alerts',    value: String(alerts.length),   sub: 'All Time',              color: '#3B82F6', bg: 'rgba(59,130,246,0.1)',  icon: Bell        },
     {
       label: 'Notifications',
       value: Object.values(notifPrefs).filter(Boolean).length + '/3',
@@ -252,7 +517,7 @@ export default function AlertsPage() {
         <div className={styles.alertsColumn}>
 
           {/* Filter bar */}
-          <div className={styles.filterBar}>
+          <div className={styles.filterBar} id="alert-list-top">
             <div className={styles.searchWrap}>
               <Search size={13} className={styles.searchIcon} />
               <input
@@ -304,7 +569,7 @@ export default function AlertsPage() {
                     className={styles.clearReadBtn}
                     onClick={() => alerts.filter(a => a.read).forEach(a => deleteAlert.mutate(a.id))}
                   >
-                    <Trash2 size={11} /> Clear read
+                    <Trash2 size={11} /> Clear Read
                   </button>
                 )}
               </div>
@@ -315,6 +580,15 @@ export default function AlertsPage() {
               {unreadCount > 0 && <span className={styles.unreadPill}>{unreadCount} unread</span>}
             </p>
           </div>
+
+          {/* ── Top pagination ── */}
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            total={filtered.length}
+            pageSize={PAGE_SIZE}
+            onChange={handlePageChange}
+          />
 
           {/* Alert list */}
           <div className={styles.alertList}>
@@ -331,7 +605,7 @@ export default function AlertsPage() {
               </div>
             ) : (
               <AnimatePresence initial={false}>
-                {filtered.map((alert, i) => {
+                {paginated.map((alert, i) => {
                   const tc = TYPE_CONFIG[alert.type as AlertType] ?? TYPE_CONFIG.system;
                   const pc = PRIORITY_CONFIG[alert.priority as AlertPriority] ?? PRIORITY_CONFIG.medium;
                   return (
@@ -390,12 +664,22 @@ export default function AlertsPage() {
               </AnimatePresence>
             )}
           </div>
+
+          {/* ── Bottom pagination ── */}
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            total={filtered.length}
+            pageSize={PAGE_SIZE}
+            onChange={handlePageChange}
+          />
+
         </div>
 
-        {/* RIGHT — Saved searches + notification prefs */}
+        {/* RIGHT — sidebar: 4 cards in order */}
         <div className={styles.sideColumn}>
 
-          {/* Saved searches */}
+          {/* 1 — Saved searches */}
           <div className={styles.sideCard}>
             <div className={styles.sideCardHeader}>
               <div>
@@ -450,7 +734,7 @@ export default function AlertsPage() {
                       <div className={styles.ssCriteria}>
                         {s.sector && (
                           <div className={styles.ssCrit}>
-                            <Filter size={10} /> {SECTOR_LABELS[s.sector] ?? s.sector}
+                            <Building2 size={10} /> {SECTOR_LABELS[s.sector] ?? s.sector}
                           </div>
                         )}
                         {s.state && (
@@ -470,7 +754,7 @@ export default function AlertsPage() {
 
                       <div className={styles.ssMeta}>
                         <span className={clsx(styles.ssNotifBadge, s.notifications ? styles.ssNotifOn : styles.ssNotifOff)}>
-                          {s.notifications ? '🔔 Notifications on' : '🔕 Muted'}
+                          {s.notifications ? '🔔 Notifications On' : '🔕 Muted'}
                         </span>
                         <span className={styles.ssMatch}>
                           {s.match_count} matches · {s.last_matched ? formatAgo(s.last_matched) : 'Never'}
@@ -483,7 +767,7 @@ export default function AlertsPage() {
             </div>
           </div>
 
-          {/* Notification preferences */}
+          {/* 2 — Notification channels */}
           <div className={styles.sideCard}>
             <div className={styles.sideCardHeader}>
               <div>
@@ -494,9 +778,9 @@ export default function AlertsPage() {
 
             <div className={styles.notifList}>
               {([
-                { key: 'email', icon: Mail,         label: 'Email Alerts',       sub: 'Delivered to Your Inbox'   },
+                { key: 'email', icon: Mail,         label: 'Email Alerts',       sub: 'Delivered to Your Inbox'    },
                 { key: 'sms',   icon: MessageSquare, label: 'SMS Alerts',         sub: 'Text Message to Your Phone' },
-                { key: 'push',  icon: Smartphone,    label: 'Push Notifications', sub: 'Browser / Mobile Push'     },
+                { key: 'push',  icon: Smartphone,    label: 'Push Notifications', sub: 'Browser / Mobile Push'      },
               ] as const).map(channel => (
                 <div key={channel.key} className={styles.notifRow}>
                   <div className={styles.notifLeft}>
@@ -513,7 +797,7 @@ export default function AlertsPage() {
                   </div>
                   <button
                     className={clsx(styles.toggle, notifPrefs[channel.key] && styles.toggleOn)}
-                    onClick={() => setNotifPrefs(p => ({ ...p, [channel.key]: !p[channel.key] }))}
+                    onClick={() => updateNotifPref(channel.key)}
                   >
                     <span className={styles.toggleThumb} />
                   </button>
@@ -522,13 +806,17 @@ export default function AlertsPage() {
             </div>
           </div>
 
+          {/* 3 — Alert Activity Summary */}
+          <AlertActivitySummary alerts={alerts} />
+
+          {/* 4 — Quick Stats */}
+          <QuickStats alerts={alerts} searches={searches} />
+
         </div>
       </div>
 
-      {/* Create alert modal */}
-      <AnimatePresence>
-        {showModal && <CreateAlertModal onClose={() => setShowModal(false)} />}
-      </AnimatePresence>
+      {/* Modal — portal to document.body so position:fixed anchors to viewport */}
+      {showModal && <CreateAlertModal onClose={() => setShowModal(false)} />}
 
     </div>
   );
