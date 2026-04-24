@@ -121,7 +121,7 @@ export default function Sidebar() {
                 exit={{    opacity: 0, height: 0 }}
               >
                 <Wifi size={12} />
-                {newTenders} new tender{newTenders > 1 ? 's' : ''} ingested
+                {newTenders} New Tenders{newTenders > 1 ? 's' : ''} Ingested
               </motion.div>
             )}
           </AnimatePresence>
