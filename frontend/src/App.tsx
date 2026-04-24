@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import AppShell from './components/layout/AppShell';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import LoginPage from './pages/LoginPage/LoginPage';
@@ -11,6 +12,7 @@ import AnalyticsPage from './pages/AnalyticsPage/AnalyticsPage';
 import ReportsPage from './pages/ReportsPage/ReportsPage';
 import CustomersPage from './pages/CustomersPage/CustomersPage';
 import AlertsPage from './pages/AlertsPage/AlertsPage';
+import { useUIStore } from './store/ui.store';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,6 +25,36 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
+  const { themeMode, resolvedTheme, setResolvedTheme } = useUIStore();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const syncResolvedTheme = () => {
+      setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
+    };
+
+    if (themeMode === 'system') {
+      syncResolvedTheme();
+
+      const onChange = () => syncResolvedTheme();
+      mediaQuery.addEventListener('change', onChange);
+
+      return () => mediaQuery.removeEventListener('change', onChange);
+    }
+
+    setResolvedTheme(themeMode);
+    return undefined;
+  }, [themeMode, setResolvedTheme]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

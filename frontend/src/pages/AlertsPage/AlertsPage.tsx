@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell, Plus, Search, X, Trash2, Check,
@@ -294,28 +295,27 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
-  return createPortal(
-    <AnimatePresence>
+  const modal = (
+    <motion.div
+      className={styles.overlay}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
       <motion.div
-        className={styles.overlay}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose}
+        className={styles.modal}
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0,  scale: 1    }}
+        exit={{    opacity: 0, y: 16, scale: 0.97  }}
+        transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+        onClick={e => e.stopPropagation()}
       >
-        <motion.div
-          className={styles.modal}
-          initial={{ opacity: 0, y: 24, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0,  scale: 1    }}
-          exit={{    opacity: 0, y: 16, scale: 0.97  }}
-          transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div className={styles.modalHeader}>
-            <div>
-              <h3 className={styles.modalTitle}>Create Saved Search</h3>
-              <p className={styles.modalSub}>Get Notified When Matching Tenders are Published</p>
-            </div>
-            <button className={styles.modalClose} onClick={onClose}><X size={16} /></button>
+        <div className={styles.modalHeader}>
+          <div>
+            <h3 className={styles.modalTitle}>Create Saved Search</h3>
+            <p className={styles.modalSub}>Get Notified When Matching Tenders are Published</p>
           </div>
+          <button className={styles.modalClose} onClick={onClose}><X size={16} /></button>
+        </div>
 
           <div className={styles.modalBody}>
             <div className={styles.formField}>
@@ -387,14 +387,21 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>,
-    document.body,
   );
+
+  return createPortal(modal, document.body);
 }
 
 // ── Main page ─────────────────────────────────────────────────
 export default function AlertsPage() {
-  const [search,         setSearch]         = useState('');
+  const [searchParams, setSearchParams]     = useSearchParams();
+  const search = searchParams.get('search') ?? '';
+  const setSearch = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (next.trim()) params.set('search', next);
+    else params.delete('search');
+    setSearchParams(params, { replace: true });
+  };
   const [typeFilter,     setTypeFilter]     = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);

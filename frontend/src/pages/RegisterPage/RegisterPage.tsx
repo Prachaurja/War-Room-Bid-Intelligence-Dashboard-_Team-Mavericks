@@ -80,7 +80,7 @@ export default function RegisterPage() {
         <div className={styles.logoWrap}>
           <div className={styles.logoIcon}><Target size={22} /></div>
           <div>
-            <h1 className={styles.logoName}>War Room</h1>
+          <h1 className={styles.logoName}>War Room</h1>
             <p className={styles.logoSub}>Bid Intelligence Platform</p>
           </div>
         </div>

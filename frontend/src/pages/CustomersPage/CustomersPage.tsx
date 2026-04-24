@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, Mail, Phone, MapPin,
@@ -195,7 +196,7 @@ function AddCustomerModal({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState({ name:'', company:'', email:'', phone:'', location:'', sector:'' });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  return (
+  const modal = (
     <motion.div
       className={styles.overlay}
       initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
@@ -248,6 +249,8 @@ function AddCustomerModal({ onClose }: { onClose: () => void }) {
       </motion.div>
     </motion.div>
   );
+
+  return createPortal(modal, document.body);
 }
 
 // ── Sort icon ─────────────────────────────────────────────────

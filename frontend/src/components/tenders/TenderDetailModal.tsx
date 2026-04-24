@@ -1,4 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { useEffect } from 'react';
 import {
   X, Building2, MapPin, DollarSign, Calendar,
   Tag, ExternalLink, FileText, Globe, Hash,
@@ -13,8 +15,16 @@ interface Props {
   onClose: () => void;
 }
 
-function Row({ icon: Icon, label, value, mono = false }: {
-  icon: React.ElementType; label: string; value: string; mono?: boolean;
+function Row({
+  icon: Icon,
+  label,
+  value,
+  mono = false,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  mono?: boolean;
 }) {
   return (
     <div className={styles.row}>
@@ -30,7 +40,26 @@ function Row({ icon: Icon, label, value, mono = false }: {
 export default function TenderDetailModal({ tender, onClose }: Props) {
   if (!tender) return null;
 
-  return (
+  const hasContractValue = tender.contract_value != null;
+
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  return createPortal(
     <AnimatePresence>
       <motion.div
         className={styles.overlay}
@@ -42,12 +71,11 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
         <motion.div
           className={styles.modal}
           initial={{ opacity: 0, y: 32, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0,  scale: 1    }}
-          exit={{   opacity: 0, y: 24, scale: 0.97  }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 24, scale: 0.97 }}
           transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-          onClick={e => e.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
         >
-          {/* Header */}
           <div className={styles.header}>
             <div className={styles.headerLeft}>
               <div
@@ -64,13 +92,11 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
             </button>
           </div>
 
-          {/* Title */}
           <div className={styles.titleSection}>
             <h2 className={styles.title}>{tender.title}</h2>
             <span className={styles[`status_${tender.status}`]}>{tender.status}</span>
           </div>
 
-          {/* Description */}
           {tender.description && (
             <div className={styles.descSection}>
               <p className={styles.descLabel}>Description / Category</p>
@@ -78,26 +104,28 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
             </div>
           )}
 
-          {/* Details grid */}
           <div className={styles.detailsGrid}>
             <div className={styles.detailsCol}>
               <p className={styles.colLabel}>Contract Details</p>
-              <Row icon={Building2} label="Agency"         value={tender.agency} />
-              <Row icon={DollarSign} label="Contract Value" value={tender.contract_value ? formatCurrencyFull(tender.contract_value) : '—'} />
-              <Row icon={MapPin}     label="State"          value={tender.state ?? 'Federal'} />
-              <Row icon={Tag}        label="Sector"         value={sectorLabel(tender.sector)} />
+              <Row icon={Building2} label="Agency" value={tender.agency} />
+              <Row
+                icon={DollarSign}
+                label="Contract Value"
+                value={hasContractValue ? formatCurrencyFull(tender.contract_value) : '—'}
+              />
+              <Row icon={MapPin} label="State" value={tender.state ?? 'Federal'} />
+              <Row icon={Tag} label="Sector" value={sectorLabel(tender.sector)} />
             </div>
             <div className={styles.detailsCol}>
               <p className={styles.colLabel}>Dates &amp; Source</p>
-              <Row icon={Calendar}  label="Close Date"     value={formatDate(tender.close_date)} />
-              <Row icon={Calendar}  label="Published"      value={formatDate(tender.published_date)} />
-              <Row icon={Globe}     label="Source"         value={tender.source_name} />
-              <Row icon={Hash}      label="Contract ID"    value={tender.source_id} mono />
+              <Row icon={Calendar} label="Close Date" value={formatDate(tender.close_date)} />
+              <Row icon={Calendar} label="Published" value={formatDate(tender.published_date)} />
+              <Row icon={Globe} label="Source" value={tender.source_name} />
+              <Row icon={Hash} label="Contract ID" value={tender.source_id} mono />
             </div>
           </div>
 
-          {/* Value highlight */}
-          {tender.contract_value && (
+          {hasContractValue && (
             <div className={styles.valueBanner}>
               <span className={styles.valueBannerLabel}>Contract Value</span>
               <span className={styles.valueBannerAmount}>
@@ -106,7 +134,6 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
             </div>
           )}
 
-          {/* Actions */}
           <div className={styles.footerActions}>
             <button className={styles.cancelBtn} onClick={onClose}>Close</button>
             {tender.source_url && (
@@ -127,6 +154,7 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
