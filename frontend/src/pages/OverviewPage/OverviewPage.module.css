@@ -1,0 +1,132 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 1400px;
+  }
+  
+  /* ── Page header ── */
+  .pageHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  
+  .heading {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  
+  .headingSub {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  
+  .dataTag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent-lighter);
+    background: var(--accent-dim);
+    border: 1px solid var(--border-accent);
+    padding: 5px 12px;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  
+  /* ── Stat grid — 4 columns ── */
+  .statGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  
+  @media (max-width: 1100px) { .statGrid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .statGrid { grid-template-columns: 1fr; } }
+  
+  /* ── Charts row — 2 equal columns ── */
+  .chartsRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  
+  @media (max-width: 900px) { .chartsRow { grid-template-columns: 1fr; } }
+  
+  /* ── Bottom row: feed (wider) + side column ── */
+  .bottomRow {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    align-items: start;
+  }
+  
+  @media (max-width: 1000px) {
+    .bottomRow { grid-template-columns: 1fr; }
+  }
+  
+  .feedWrap { min-width: 0; }
+  
+  .sideWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  /* ── Mini stats card ── */
+  .miniCard {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+  }
+  
+  .miniHeader {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+  
+  .miniIcon { color: var(--accent-lighter); }
+  
+  .miniGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  
+  .miniStat {
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+  }
+  
+  .miniLabel {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .miniValue {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: 4px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }

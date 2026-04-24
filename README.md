@@ -48,7 +48,39 @@ graph TD
 ```
 
 ## Getting Started
-*(Instructions for local Docker setup and MicroK8s deployment will be added here as the infrastructure is finalized.)*
+
+### Run with Docker Compose
+
+```bash
+# optional: copy env defaults
+cp .env.example .env
+
+# start frontend + postgres
+docker compose up -d
+
+# view logs
+docker compose logs -f
+```
+
+Frontend: `http://localhost:5173`
+
+PostgreSQL:
+- host: `localhost`
+- port: `5432`
+- db: `cap`
+- user: `postgres`
+- password: `postgres`
+
+The DB is initialized automatically from:
+- `database/schema.sql`
+- `database/seed.sql`
+
+Quick check:
+
+```bash
+docker exec -it cap-postgres psql -U postgres -d cap -c "select count(*) from bids;"
+```
+
 
 ## Acknowledgments & Licenses
 This project is built upon the open-source foundations of:
