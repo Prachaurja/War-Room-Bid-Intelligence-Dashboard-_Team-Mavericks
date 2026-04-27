@@ -111,7 +111,7 @@ async def get_overview_stats(db: AsyncSession) -> OverviewStats:
 
     return OverviewStats(
         total_tenders=val_row.cnt,
-        active_tenders=status_counts.get("active", 0),
+        active_tenders=status_counts.get("active", 0) + status_counts.get("open", 0),
         closed_tenders=status_counts.get("closed", 0),
         upcoming_tenders=status_counts.get("upcoming", 0),
         total_value=float(val_row.total),
