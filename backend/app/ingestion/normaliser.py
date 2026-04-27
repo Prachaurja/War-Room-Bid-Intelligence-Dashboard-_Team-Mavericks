@@ -271,6 +271,24 @@ def normalise(source_name: str, raw: Dict[str, Any]) -> Optional[Dict[str, Any]]
     elif source_name == "nsw_etender":
         return normalise_nsw_csv(raw)
 
+    elif source_name == "tendersnet":
+        if not raw.get("title"):
+            return None
+        return {
+            "title":          raw.get("title"),
+            "description":    raw.get("description", ""),
+            "agency":         raw.get("agency", ""),
+            "sector":         raw.get("sector", "other"),
+            "state":          raw.get("state", "Federal"),
+            "status":         raw.get("status", "open"),
+            "contract_value": raw.get("contract_value", 0.0),
+            "close_date":     raw.get("close_date"),
+            "published_date": raw.get("published_date"),
+            "source_name":    raw.get("source_name", "tendersnet"),
+            "source_id":      raw.get("source_id"),
+            "source_url":     raw.get("source_url", ""),
+        }
+
     else:
         logger.warning(f"Unknown source: {source_name}")
         return None
