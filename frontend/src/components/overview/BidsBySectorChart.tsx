@@ -35,7 +35,7 @@ import {
         <div className={styles.header}>
           <div>
             <h3 className={styles.title}>Bids by Sector</h3>
-            <p className={styles.sub}>Contract Distribution Across Sectors</p>
+            <p className={styles.sub}>Tenders Distribution Across Sectors</p>
           </div>
           <div className={styles.pill}>{chartData.length} sectors</div>
         </div>
