@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -27,43 +27,37 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 export default function TendersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab]         = useState<Tab>('closed');
-  const [search, setSearch]               = useState(searchParams.get('search') ?? '');
   const [sector, setSector]               = useState('');
   const [state, setState]                 = useState('');
   const [page, setPage]                   = useState(1);
   const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
 
+  const search = searchParams.get('search') ?? '';
+  const setSearch = useCallback((next: string) => {
+    setSearchParams(prev => {
+      const params = new URLSearchParams(prev);
+      if (next.trim()) params.set('search', next);
+      else params.delete('search');
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   const debouncedSearch = useDebounce(search, 400);
 
   // When filters change, reset to page 1
-  const handleSearch = useCallback((v: string) => { setSearch(v);  setPage(1); }, []);
+  const handleSearch = useCallback((v: string) => { setSearch(v);  setPage(1); }, [setSearch]);
   const handleSector = useCallback((v: string) => { setSector(v);  setPage(1); }, []);
   const handleState  = useCallback((v: string) => { setState(v);   setPage(1); }, []);
   const handleTab    = useCallback((t: Tab)    => { setActiveTab(t); setPage(1); }, []);
 
   const handleClear = useCallback(() => {
     setSearch(''); setSector(''); setState(''); setPage(1);
-  }, []);
-
-  useEffect(() => {
-    const nextSearch = searchParams.get('search') ?? '';
-    if (nextSearch !== search) {
-      setSearch(nextSearch);
-      setPage(1);
-    }
-  }, [searchParams, search]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    if (search.trim()) params.set('search', search.trim());
-    else params.delete('search');
-    setSearchParams(params, { replace: true });
-  }, [search, searchParams, setSearchParams]);
+  }, [setSearch]);
 
   const filters = {
     page,
     page_size: 15,
-    status:     activeTab,
+    status:     activeTab === 'active' ? 'open' : activeTab,
     sector:     sector    || undefined,
     state:      state     || undefined,
     search:     debouncedSearch || undefined,

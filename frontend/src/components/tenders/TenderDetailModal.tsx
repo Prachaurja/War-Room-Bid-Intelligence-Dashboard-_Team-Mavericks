@@ -38,11 +38,9 @@ function Row({
 }
 
 export default function TenderDetailModal({ tender, onClose }: Props) {
-  if (!tender) return null;
-
-  const hasContractValue = tender.contract_value != null;
-
   useEffect(() => {
+    if (!tender) return;
+
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
@@ -57,7 +55,11 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
       document.body.style.overflow = originalOverflow;
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [tender, onClose]);
+
+  if (!tender) return null;
+
+  const hasContractValue = tender.contract_value != null;
 
   return createPortal(
     <AnimatePresence>
