@@ -39,7 +39,11 @@ async def upsert_tender(
         existing.agency         = normalised.get("agency",         existing.agency)
         existing.contract_value = normalised.get("contract_value", existing.contract_value)
         existing.close_date     = normalised.get("close_date",     existing.close_date)
-        existing.status         = normalised.get("status",         existing.status)
+        
+        # Do not overwrite status if expiry job already marked it closed
+        new_status = normalised.get("status", existing.status)
+        if existing.status != "closed" or new_status == "closed":
+            existing.status = new_status
         existing.description    = normalised.get("description",    existing.description)
         logger.debug(f"Updated Tender: {source_name}/{source_id}")
         return existing, False  # not new

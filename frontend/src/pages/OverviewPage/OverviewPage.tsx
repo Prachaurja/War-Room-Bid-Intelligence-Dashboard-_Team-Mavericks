@@ -1,7 +1,10 @@
+import { useMemo, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   DollarSign, Layers, CheckCircle2, Clock,
-  TrendingUp, Database,
+  TrendingUp, Bell, ArrowRight, Zap,
+  Sparkles, Radio,
 } from 'lucide-react';
 import StatCard from '../../components/overview/StatCard';
 import BidsBySectorChart from '../../components/overview/BidsBySectorChart';
@@ -9,23 +12,93 @@ import RegionalBidChart from '../../components/overview/RegionalBidChart';
 import RecentActivityFeed from '../../components/overview/RecentActivityFeed';
 import SourceBreakdown from '../../components/overview/SourceBreakdown';
 import { useOverviewStats } from '../../hooks/useTenders';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { useAlerts } from '../../hooks/useAlerts';
+import { useAuth } from '../../hooks/useAuth';
+import { formatCurrency, formatNumber, formatAgo } from '../../utils/formatters';
 import styles from './OverviewPage.module.css';
+
+// ── Source display config ─────────────────────────────────────
+const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
+  austender:   { label: 'AusTender',   color: '#7C3AED' },
+  nsw_etender: { label: 'NSW eTender', color: '#3B82F6' },
+  qld:         { label: 'QLD Tenders', color: '#F59E0B' },
+  manual:      { label: 'Manual',      color: '#10B981' },
+};
+
+const STORAGE_KEY_COUNT     = 'wr_last_total_tenders';
+const STORAGE_KEY_TIMESTAMP = 'wr_last_visit_ts';
 
 export default function OverviewPage() {
   const { data: stats, isLoading } = useOverviewStats();
+  const { data: alertsData }       = useAlerts();
+  const { user }                   = useAuth();
+  const navigate                   = useNavigate();
+
+  // ── New-tenders-since-last-visit tracking ─────────────────
+  // Snapshot the previous-visit values once on mount so derived values
+  // remain stable while we update localStorage for the next visit.
+  const [snapshot] = useState(() => {
+    const rawCount = localStorage.getItem(STORAGE_KEY_COUNT);
+    return {
+      prevCount: rawCount !== null ? Number(rawCount) : null,
+      prevTs:    localStorage.getItem(STORAGE_KEY_TIMESTAMP),
+    };
+  });
+
+  const newSinceLastVisit = useMemo<number | null>(() => {
+    if (stats?.total_tenders == null || snapshot.prevCount === null) return null;
+    const diff = stats.total_tenders - snapshot.prevCount;
+    return diff > 0 ? diff : 0;
+  }, [stats?.total_tenders, snapshot.prevCount]);
+
+  const lastVisitTs = snapshot.prevTs;
+
+  useEffect(() => {
+    if (stats?.total_tenders == null) return;
+    localStorage.setItem(STORAGE_KEY_COUNT,     String(stats.total_tenders));
+    localStorage.setItem(STORAGE_KEY_TIMESTAMP, new Date().toISOString());
+  }, [stats?.total_tenders]);
+
+  const unreadAlerts = useMemo(
+    () => (alertsData ?? []).filter(a => !a.read).length,
+    [alertsData],
+  );
+
+  const firstName = useMemo(() => {
+    const name = user?.name ?? '';
+    return name.split(' ')[0] || 'Analyst';
+  }, [user]);
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }, []);
+
+  const today = useMemo(() =>
+    new Date().toLocaleDateString('en-AU', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    }),
+    [],
+  );
+
+  const sources = useMemo(
+    () => Object.entries(stats?.sources ?? {}),
+    [stats?.sources],
+  );
 
   const statCards = [
     {
-      title:    'Total Contract Value',
+      title:    'Total Tenders Value',
       value:    formatCurrency(stats?.total_value),
-      sub:      `Avg ${formatCurrency(stats?.avg_value)} Per Contract`,
+      sub:      `Avg ${formatCurrency(stats?.avg_value)} Per Tender`,
       icon:     DollarSign,
       gradient: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
       change:   0,
     },
     {
-      title:    'Total Contracts',
+      title:    'Total Tenders',
       value:    formatNumber(stats?.total_tenders),
       sub:      `Across ${Object.keys(stats?.sources ?? {}).length} Data Sources`,
       icon:     Layers,
@@ -33,19 +106,19 @@ export default function OverviewPage() {
       change:   8.1,
     },
     {
-      title:    'Active Bids',
+      title:    'Active Tenders',
       value:    formatNumber(stats?.active_tenders ?? 0),
       sub:      stats?.upcoming_tenders
         ? `+ ${stats.upcoming_tenders} upcoming`
         : 'Live Procurement Opportunities',
       icon:     Clock,
-      gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', 
+      gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
       change:   stats?.active_tenders ? 3.2 : undefined,
     },
     {
       title:    'Closed Tenders',
       value:    formatNumber(stats?.closed_tenders),
-      sub:      'Historical GaPS Contracts',
+      sub:      'Historical GaPS Tenders',
       icon:     CheckCircle2,
       gradient: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
       change:   5.3,
@@ -55,22 +128,118 @@ export default function OverviewPage() {
   return (
     <div className={`${styles.page} page-enter`}>
 
-      {/* ── Page header ── */}
+      {/* ── Welcome strip ── */}
       <motion.div
-        className={styles.pageHeader}
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y:  0  }}
-        transition={{ duration: 0.3 }}
+        className={styles.welcomeStrip}
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
       >
-        <div>
-          <h2 className={styles.heading}>Intelligence Overview</h2>
-          <p className={styles.headingSub}>
-            Real-time Data from Australian Government Procurement Feeds
-          </p>
+        {/* LEFT — greeting + badges */}
+        <div className={styles.welcomeLeft}>
+          <div className={styles.welcomeTextBlock}>
+            <h1 className={styles.welcomeHeading}>
+              {greeting}, <span className={styles.welcomeName}>{firstName}!</span>
+            </h1>
+            <p className={styles.welcomeSub}>{today}</p>
+          </div>
+
+          <div className={styles.welcomeBadges}>
+            {unreadAlerts > 0 && (
+              <motion.button
+                className={styles.alertBadge}
+                onClick={() => navigate('/alerts')}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <Bell size={11} />
+                {unreadAlerts} unread alert{unreadAlerts !== 1 ? 's' : ''}
+                <ArrowRight size={11} />
+              </motion.button>
+            )}
+            {stats?.active_tenders != null && (
+              <div className={styles.activeBadge}>
+                <Zap size={11} />
+                {formatNumber(stats.active_tenders)} Active Tenders
+              </div>
+            )}
+          </div>
         </div>
-        <div className={styles.dataTag}>
-          <Database size={12} />
-          <span>AusTender · GaPS Export</span>
+
+        {/* DIVIDER */}
+        <div className={styles.stripDivider} />
+
+        {/* RIGHT — ingestion status + new tenders */}
+        <div className={styles.welcomeRight}>
+
+          {/* New tenders since last visit */}
+          <div className={styles.newTendersBlock}>
+            <div className={styles.newTendersHeader}>
+              <Sparkles size={12} className={styles.newTendersIcon} />
+              <span className={styles.newTendersLabel}>New since last visit</span>
+            </div>
+            {isLoading ? (
+              <div className={styles.newTendersCount} style={{ color: 'var(--text-dim)' }}>…</div>
+            ) : newSinceLastVisit === null ? (
+              <div className={styles.newTendersCount}>First visit</div>
+            ) : newSinceLastVisit === 0 ? (
+              <div className={styles.newTendersCount} style={{ color: 'var(--text-muted)' }}>
+                No New Tenders
+              </div>
+            ) : (
+              <div className={styles.newTendersCount}>
+                +{formatNumber(newSinceLastVisit)} Tenders
+              </div>
+            )}
+            {lastVisitTs && (
+              <p className={styles.newTendersSub}>
+                Last visit {formatAgo(lastVisitTs)}
+              </p>
+            )}
+          </div>
+
+          <div className={styles.rightInnerDivider} />
+
+          {/* Ingestion status per source */}
+          <div className={styles.ingestionBlock}>
+            <div className={styles.ingestionHeader}>
+              <Radio size={12} className={styles.ingestionIcon} />
+              <span className={styles.ingestionLabel}>Ingestion Status</span>
+            </div>
+            <div className={styles.sourceRows}>
+              {isLoading ? (
+                [1, 2, 3].map(i => (
+                  <div key={i} className={styles.sourceStatusRow}>
+                    <div className={styles.shimmer} style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0 }} />
+                    <div className={styles.shimmer} style={{ flex: 1, height: 10 }} />
+                    <div className={styles.shimmer} style={{ width: 36, height: 10 }} />
+                  </div>
+                ))
+              ) : sources.length === 0 ? (
+                <p className={styles.noSources}>No sources connected</p>
+              ) : (
+                sources.map(([name, count]) => {
+                  const cfg   = SOURCE_CONFIG[name] ?? { label: name.replace('_', ' '), color: '#6B7280' };
+                  const total = sources.reduce((s, [, v]) => s + v, 0);
+                  const pct   = total > 0 ? Math.round((count / total) * 100) : 0;
+                  return (
+                    <div key={name} className={styles.sourceStatusRow}>
+                      <span
+                        className={styles.sourceStatusDot}
+                        style={{ background: cfg.color, boxShadow: `0 0 5px ${cfg.color}` }}
+                      />
+                      <span className={styles.sourceStatusLabel}>{cfg.label}</span>
+                      <span className={styles.sourceStatusCount}>{formatNumber(count)}</span>
+                      <span className={styles.sourceStatusPct} style={{ color: cfg.color }}>
+                        {pct}%
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
         </div>
       </motion.div>
 
@@ -100,11 +269,10 @@ export default function OverviewPage() {
         <div className={styles.sideWrap}>
           <SourceBreakdown />
 
-          {/* Quick-stats mini card */}
           <motion.div
             className={styles.miniCard}
             initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0  }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
             <div className={styles.miniHeader}>
@@ -113,10 +281,10 @@ export default function OverviewPage() {
             </div>
             <div className={styles.miniGrid}>
               {[
-                { label: 'Avg Contract',   value: formatCurrency(stats?.avg_value) },
-                { label: 'Total Sources',  value: String(Object.keys(stats?.sources ?? {}).length) },
-                { label: 'Closed',         value: formatNumber(stats?.closed_tenders) },
-                { label: 'Active',         value: formatNumber(stats?.active_tenders ?? 0) },
+                { label: 'Avg Tender',    value: formatCurrency(stats?.avg_value) },
+                { label: 'Total Sources', value: String(Object.keys(stats?.sources ?? {}).length) },
+                { label: 'Closed',        value: formatNumber(stats?.closed_tenders) },
+                { label: 'Active',        value: formatNumber(stats?.active_tenders ?? 0) },
               ].map(item => (
                 <div key={item.label} className={styles.miniStat}>
                   <p className={styles.miniLabel}>{item.label}</p>
@@ -127,6 +295,7 @@ export default function OverviewPage() {
           </motion.div>
         </div>
       </div>
+
     </div>
   );
 }

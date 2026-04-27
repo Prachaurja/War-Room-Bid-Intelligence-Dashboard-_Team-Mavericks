@@ -38,7 +38,7 @@ import {
         <div className={styles.header}>
           <div>
             <h3 className={styles.title}>Regional Distribution</h3>
-            <p className={styles.sub}>Contracts by Australian State</p>
+            <p className={styles.sub}>Tenders by Australian State</p>
           </div>
           <div className={styles.pill}>{chartData.length} states</div>
         </div>

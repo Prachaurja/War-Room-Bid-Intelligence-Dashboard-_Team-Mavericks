@@ -13,7 +13,7 @@ export default function RecentActivityFeed() {
     <div className={styles.card}>
       <div className={styles.header}>
         <div>
-          <h3 className={styles.title}>Recent Contracts</h3>
+          <h3 className={styles.title}>Recent Tenders</h3>
           <p className={styles.sub}>Latest from AusTender</p>
         </div>
         <div className={styles.live}>
