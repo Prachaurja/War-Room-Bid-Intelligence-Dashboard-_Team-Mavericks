@@ -109,6 +109,15 @@ async def get_overview_stats(db: AsyncSession) -> OverviewStats:
     ).all()
     sources = {r.source_name: r.cnt for r in src_rows}
 
+    # Value by status
+    status_value_rows = (
+        await db.execute(
+            select(Tender.status, func.coalesce(func.sum(Tender.contract_value), 0).label("total"))
+            .group_by(Tender.status)
+        )
+    ).all()
+    status_values = {r.status: float(r.total) for r in status_value_rows}
+
     return OverviewStats(
         total_tenders=val_row.cnt,
         active_tenders=status_counts.get("active", 0) + status_counts.get("open", 0),
@@ -116,6 +125,9 @@ async def get_overview_stats(db: AsyncSession) -> OverviewStats:
         upcoming_tenders=status_counts.get("upcoming", 0),
         total_value=float(val_row.total),
         avg_value=float(val_row.avg),
+        active_value=status_values.get("open", 0.0) + status_values.get("active", 0.0),
+        closed_value=status_values.get("closed", 0.0),
+        upcoming_value=status_values.get("upcoming", 0.0),
         sources=sources,
     )
 
@@ -154,3 +166,34 @@ async def get_stats_by_state(db: AsyncSession) -> List[StateStat]:
         StateStat(state=r.state or "Unknown", count=r.cnt, total_value=float(r.total))
         for r in rows
     ]
+
+async def get_stats_by_source(db: AsyncSession):
+    """
+    Returns value and count broken down by source_name and status.
+    Used for the source-wise value breakdown in the Active Bids card.
+    """
+    from sqlalchemy import case
+    rows = (
+        await db.execute(
+            select(
+                Tender.source_name,
+                Tender.status,
+                func.count(Tender.id).label("cnt"),
+                func.coalesce(func.sum(Tender.contract_value), 0).label("total_value"),
+            )
+            .group_by(Tender.source_name, Tender.status)
+            .order_by(Tender.source_name, Tender.status)
+        )
+    ).all()
+
+    # Build nested dict: { source_name: { status: { count, value } } }
+    result = {}
+    for row in rows:
+        src = row.source_name or "unknown"
+        if src not in result:
+            result[src] = {}
+        result[src][row.status] = {
+            "count": row.cnt,
+            "value": float(row.total_value),
+        }
+    return result

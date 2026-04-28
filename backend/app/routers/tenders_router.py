@@ -10,6 +10,7 @@ from app.services.tender_service import (
     get_overview_stats,
     get_stats_by_sector,
     get_stats_by_state,
+    get_stats_by_source,
 )
 from app.schemas.tender_schema import (
     TenderRead,
@@ -146,3 +147,18 @@ async def get_tender(
     if not tender:
         raise HTTPException(status_code=404, detail="Tender not found")
     return TenderRead.model_validate(tender)
+
+# ── GET /tenders/stats/by-source ─────────────────────────────
+@router.get("/stats/by-source")
+async def stats_by_source(db: AsyncSession = Depends(get_db)):
+    """
+    Returns tender count and value broken down by source and status.
+    Used for source-wise value breakdown in the Active Bids card.
+    """
+    cache_key = "warroom:stats:by-source"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    result = await get_stats_by_source(db)
+    await cache_set(cache_key, result, TTL_5_MIN)
+    return result
