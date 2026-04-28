@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Bell, Plus, Search, X, Trash2, Check,
+  Bell, BellOff, Plus, Search, X, Trash2, Check,
   CheckCheck, AlertCircle, TrendingUp, FileText,
   Info, Building2, Mail, MessageSquare, Smartphone,
   Target, Clock, MapPin, DollarSign, Save,
@@ -761,7 +761,8 @@ export default function AlertsPage() {
 
                       <div className={styles.ssMeta}>
                         <span className={clsx(styles.ssNotifBadge, s.notifications ? styles.ssNotifOn : styles.ssNotifOff)}>
-                          {s.notifications ? '🔔 Notifications On' : '🔕 Muted'}
+                          {s.notifications ? <Bell size={12} /> : <BellOff size={12} />}
+                          {s.notifications ? 'Notifications On' : 'Muted'}
                         </span>
                         <span className={styles.ssMatch}>
                           {s.match_count} matches · {s.last_matched ? formatAgo(s.last_matched) : 'Never'}

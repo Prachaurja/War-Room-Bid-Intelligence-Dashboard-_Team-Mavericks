@@ -9,14 +9,17 @@ import {
   ArrowRight,
   Clock3,
   CheckCheck,
+  X,
+  CheckCircle2,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAlerts, useMarkAllRead, useMarkRead } from '../../hooks/useAlerts';
 import { useTenders } from '../../hooks/useTenders';
-import { useUIStore } from '../../store/ui.store';
+import { type ThemeMode, useUIStore } from '../../store/ui.store';
 import { formatAgo } from '../../utils/formatters';
 import styles from './TopBar.module.css';
 
@@ -43,7 +46,7 @@ interface SearchAction {
 }
 
 export default function TopBar({ pathname }: TopBarProps) {
-  const { toggleSidebar, themeMode, resolvedTheme, cycleThemeMode } = useUIStore();
+  const { toggleSidebar, themeMode, resolvedTheme, setThemeMode } = useUIStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: alertsData } = useAlerts();
@@ -54,6 +57,7 @@ export default function TopBar({ pathname }: TopBarProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const notifRef = useRef<HTMLDivElement>(null);
@@ -77,6 +81,11 @@ export default function TopBar({ pathname }: TopBarProps) {
   }[themeMode];
 
   const ThemeIcon = themeConfig.icon;
+  const themeOptions: Array<{ mode: ThemeMode; title: string; subtitle: string; previewClass: string; icon: React.ElementType }> = [
+    { mode: 'light', title: 'Light', subtitle: 'Clean daytime workspace', previewClass: styles.previewLight, icon: Sun },
+    { mode: 'dark', title: 'Dark', subtitle: 'Deep contrast workspace', previewClass: styles.previewDark, icon: Moon },
+    { mode: 'system', title: 'System', subtitle: 'Follow device setting', previewClass: styles.previewSystem, icon: Monitor },
+  ];
   const unreadAlerts = (alertsData ?? []).filter((alert) => !alert.read);
   const recentAlerts = [...(alertsData ?? [])].slice(0, 5);
   const tenders = tendersData?.items ?? [];
@@ -143,12 +152,12 @@ export default function TopBar({ pathname }: TopBarProps) {
     {
       id: 'theme',
       kind: 'action',
-      title: `Theme: ${themeConfig.label}`,
+      title: 'Appearance',
       description: `Current resolved theme is ${resolvedTheme}`,
       keywords: ['theme', 'dark', 'light', 'system', 'appearance'],
-      run: () => cycleThemeMode(),
+      run: () => setAppearanceOpen(true),
     },
-  ], [navigate, themeConfig.label, resolvedTheme, cycleThemeMode]);
+  ], [navigate, resolvedTheme]);
 
   const tenderActions = useMemo<SearchAction[]>(
     () => tenders.map((tender) => ({
@@ -242,6 +251,7 @@ export default function TopBar({ pathname }: TopBarProps) {
       if (event.key === 'Escape') {
         setSearchOpen(false);
         setNotifOpen(false);
+        setAppearanceOpen(false);
       }
     };
 
@@ -270,12 +280,12 @@ export default function TopBar({ pathname }: TopBarProps) {
       <div className={styles.right}>
         <button
           className={styles.themeBtn}
-          onClick={cycleThemeMode}
-          title={`Theme mode: ${themeConfig.label} (${resolvedTheme})`}
-          aria-label={`Theme mode: ${themeConfig.label}. Click to switch theme mode.`}
+          onClick={() => setAppearanceOpen(true)}
+          title="Appearance"
+          aria-label="Open appearance settings"
         >
           <ThemeIcon size={15} />
-          <span className={styles.themeLabel}>{themeConfig.label}</span>
+          <span className={styles.themeLabel}>Appearance</span>
         </button>
 
         <button
@@ -420,6 +430,90 @@ export default function TopBar({ pathname }: TopBarProps) {
             </div>
           </div>
         </div>,
+        document.body,
+      )}
+
+      {createPortal(
+        <AnimatePresence>
+          {appearanceOpen && (
+            <motion.div
+              className={styles.appearanceOverlay}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAppearanceOpen(false)}
+            >
+              <motion.div
+                className={styles.appearanceModal}
+                initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 16, scale: 0.97 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className={styles.appearanceHeader}>
+                  <div>
+                    <h2 className={styles.appearanceTitle}>Appearance</h2>
+                    <p className={styles.appearanceSub}>Change your workspace theme</p>
+                  </div>
+                  <button className={styles.appearanceClose} onClick={() => setAppearanceOpen(false)}>
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className={styles.appearanceBody}>
+                  <div className={styles.appearanceSection}>
+                    <p className={styles.appearanceSectionTitle}>Interface theme</p>
+                    <p className={styles.appearanceSectionSub}>Choose how Dashboard should look.</p>
+                    <div className={styles.themePreviewGrid}>
+                      {themeOptions.map((option) => {
+                        const OptionIcon = option.icon;
+                        const selected = themeMode === option.mode;
+
+                        return (
+                          <button
+                            key={option.mode}
+                            className={`${styles.themePreviewCard} ${selected ? styles.themePreviewActive : ''}`}
+                            onClick={() => setThemeMode(option.mode)}
+                          >
+                            <div className={`${styles.themePreviewArt} ${option.previewClass}`}>
+                              <div className={styles.previewWindowDots}>
+                                <span />
+                                <span />
+                                <span />
+                              </div>
+                              <div className={styles.previewSidebar}>
+                                <span />
+                                <span />
+                                <span />
+                                <span />
+                              </div>
+                              <div className={styles.previewContent}>
+                                <span className={styles.previewLineShort} />
+                                <span className={styles.previewLineMain} />
+                                <span className={styles.previewLineMuted} />
+                                <span className={styles.previewLineSmall} />
+                              </div>
+                            </div>
+                            <div className={styles.themePreviewFooter}>
+                              <div>
+                                <span className={styles.themePreviewName}>{option.title}</span>
+                                <span className={styles.themePreviewDesc}>{option.subtitle}</span>
+                              </div>
+                              <span className={styles.themePreviewCheck}>
+                                {selected ? <CheckCircle2 size={17} /> : <OptionIcon size={16} />}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
         document.body,
       )}
     </header>
