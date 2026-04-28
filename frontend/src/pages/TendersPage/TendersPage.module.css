@@ -228,8 +228,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
     gap: 8px;
     padding-top: 8px;
+  }
+
+  .pageMain {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
   
   .pageBtn {
@@ -275,4 +284,69 @@
     font-size: 12px;
     color: var(--text-dim);
     padding: 0 4px;
+  }
+
+  .pageJump {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 8px;
+  }
+
+  .pageJumpLabel {
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .pageJumpInput {
+    width: 64px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 12.5px;
+    font-family: var(--font-sans);
+    text-align: center;
+    outline: none;
+    transition: var(--transition-fast);
+  }
+
+  .pageJumpInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+
+  .pageJumpBtn {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    transition: var(--transition-fast);
+  }
+
+  .pageJumpBtn:hover {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+  }
+
+  @media (max-width: 700px) {
+    .pagination,
+    .pageMain,
+    .pageNumbers {
+      justify-content: center;
+    }
+
+    .pageJump {
+      width: 100%;
+      justify-content: center;
+      padding-left: 0;
+    }
   }

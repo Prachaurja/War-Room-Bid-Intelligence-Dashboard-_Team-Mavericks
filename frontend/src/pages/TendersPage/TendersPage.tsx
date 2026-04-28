@@ -1,15 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Download, AlertCircle, Clock,
   CheckCircle2, Layers, DollarSign,
   TrendingUp, Inbox,
 } from 'lucide-react';
+import { tendersApi } from '../../api/endpoints/tenders.api';
 import { useTenders, useOverviewStats } from '../../hooks/useTenders';
 import { useDebounce } from '../../hooks/useDebounce';
 import TenderCard from '../../components/tenders/TenderCard';
-import TenderFilters from '../../components/tenders/TenderFilters';
+import TenderFilters, { type PageSize } from '../../components/tenders/TenderFilters';
 import TenderDetailModal from '../../components/tenders/TenderDetailModal';
 import type { Tender } from '../../types/tender.types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
@@ -17,6 +19,7 @@ import styles from './TendersPage.module.css';
 import clsx from 'clsx';
 
 type Tab = 'active' | 'upcoming' | 'closed';
+type PageItem = number | 'dots-left' | 'dots-right';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'active',   label: 'Active Bids', icon: AlertCircle  },
@@ -24,12 +27,53 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'closed',   label: 'Closed Bids',      icon: CheckCircle2 },
 ];
 
+const getVisiblePages = (currentPage: number, totalPages: number): PageItem[] => {
+  if (totalPages <= 9) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pages = new Set<number>([1, totalPages]);
+  const start = Math.max(2, currentPage - 2);
+  const end = Math.min(totalPages - 1, currentPage + 2);
+
+  for (let pageNumber = start; pageNumber <= end; pageNumber += 1) {
+    pages.add(pageNumber);
+  }
+
+  if (currentPage <= 4) {
+    [2, 3, 4, 5, 6].forEach((pageNumber) => pages.add(pageNumber));
+  }
+
+  if (currentPage >= totalPages - 3) {
+    [totalPages - 5, totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1]
+      .filter((pageNumber) => pageNumber > 1)
+      .forEach((pageNumber) => pages.add(pageNumber));
+  }
+
+  const sortedPages = Array.from(pages).sort((a, b) => a - b);
+  const result: PageItem[] = [];
+
+  sortedPages.forEach((pageNumber, index) => {
+    const previousPage = sortedPages[index - 1];
+    if (previousPage && pageNumber - previousPage > 1) {
+      result.push(previousPage === 1 ? 'dots-left' : 'dots-right');
+    }
+    result.push(pageNumber);
+  });
+
+  return result;
+};
+
 export default function TendersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab]         = useState<Tab>('closed');
+  const [activeTab, setActiveTab]         = useState<Tab>('upcoming');
   const [sector, setSector]               = useState('');
   const [state, setState]                 = useState('');
+  const [year, setYear]                   = useState('');
+  const [sourceName, setSourceName]       = useState('');
+  const [pageSize, setPageSize]           = useState<PageSize>('15');
   const [page, setPage]                   = useState(1);
+  const [jumpPage, setJumpPage]           = useState('1');
   const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
 
   const search = searchParams.get('search') ?? '';
@@ -48,27 +92,129 @@ export default function TendersPage() {
   const handleSearch = useCallback((v: string) => { setSearch(v);  setPage(1); }, [setSearch]);
   const handleSector = useCallback((v: string) => { setSector(v);  setPage(1); }, []);
   const handleState  = useCallback((v: string) => { setState(v);   setPage(1); }, []);
+  const handleYear   = useCallback((v: string) => { setYear(v);    setPage(1); }, []);
+  const handleSource = useCallback((v: string) => { setSourceName(v); setPage(1); }, []);
+  const handlePageSize = useCallback((v: PageSize) => { setPageSize(v); setPage(1); }, []);
   const handleTab    = useCallback((t: Tab)    => { setActiveTab(t); setPage(1); }, []);
 
   const handleClear = useCallback(() => {
-    setSearch(''); setSector(''); setState(''); setPage(1);
+    setSearch(''); setSector(''); setState(''); setYear(''); setSourceName(''); setPage(1);
   }, [setSearch]);
 
+  const hasYearFilter = Boolean(year);
+  const showAllResults = pageSize === 'all';
+  const pageSizeNumber = showAllResults ? 100 : Number(pageSize);
+  const needsFullDataset = hasYearFilter || showAllResults;
+
   const filters = {
-    page,
-    page_size: 15,
+    page:       needsFullDataset ? 1 : page,
+    page_size:  needsFullDataset ? 100 : pageSizeNumber,
     status:     activeTab === 'active' ? 'open' : activeTab,
     sector:     sector    || undefined,
     state:      state     || undefined,
+    source_name: sourceName || undefined,
     search:     debouncedSearch || undefined,
   };
 
   const { data, isLoading, isError } = useTenders(filters);
   const { data: stats }              = useOverviewStats();
 
-  const tenders    = data?.items      ?? [];
-  const total      = data?.total      ?? 0;
-  const totalPages = data?.total_pages ?? 1;
+  const rawTenders = data?.items ?? [];
+  const yearFetchFilters = {
+    status: activeTab === 'active' ? 'open' : activeTab,
+    sector: sector || undefined,
+    state: state || undefined,
+    source_name: sourceName || undefined,
+    search: debouncedSearch || undefined,
+  };
+
+  const fullDatasetQuery = useQuery({
+    queryKey: ['tenders-full-dataset', yearFetchFilters, pageSize],
+    enabled: needsFullDataset,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    queryFn: async () => {
+      const firstPage = await tendersApi.list({ ...yearFetchFilters, page: 1, page_size: 100 });
+      const items = [...firstPage.items];
+
+      const totalPagesToFetch = Math.max(firstPage.total_pages, Math.ceil(firstPage.total / 100));
+      for (let nextPage = 2; nextPage <= totalPagesToFetch; nextPage += 1) {
+        try {
+          const pageData = await tendersApi.list({ ...yearFetchFilters, page: nextPage, page_size: 100 });
+          items.push(...pageData.items);
+        } catch (error) {
+          console.warn(`Could not load tender page ${nextPage}; showing ${items.length} loaded tenders.`, error);
+          break;
+        }
+      }
+
+      return items;
+    },
+  });
+
+  const allYearTenders = useMemo(
+    () => needsFullDataset ? fullDatasetQuery.data ?? rawTenders : rawTenders,
+    [needsFullDataset, rawTenders, fullDatasetQuery.data],
+  );
+
+  const isYearLoading = needsFullDataset && (fullDatasetQuery.isLoading || fullDatasetQuery.isFetching);
+  const isListLoading = isLoading || isYearLoading;
+  const isListError = isError;
+
+  const getTenderYear = (tender: Tender) => {
+    if (!tender.close_date) return '';
+
+    const parsed = new Date(tender.close_date);
+    return Number.isNaN(parsed.getTime()) ? '' : String(parsed.getFullYear());
+  };
+
+  const yearFilteredTenders = useMemo(() => {
+    if (!year) return needsFullDataset ? allYearTenders : rawTenders;
+    return allYearTenders.filter((tender) => getTenderYear(tender) === year);
+  }, [allYearTenders, needsFullDataset, rawTenders, year]);
+
+  const tenders = showAllResults
+    ? yearFilteredTenders
+    : needsFullDataset
+      ? yearFilteredTenders.slice((page - 1) * pageSizeNumber, page * pageSizeNumber)
+    : rawTenders;
+
+  const total = needsFullDataset ? yearFilteredTenders.length : data?.total ?? 0;
+  const totalPages = showAllResults
+    ? 1
+    : needsFullDataset
+      ? Math.max(1, Math.ceil(total / pageSizeNumber))
+      : data?.total_pages ?? 1;
+  const visiblePages = useMemo(() => getVisiblePages(page, totalPages), [page, totalPages]);
+
+  useEffect(() => {
+    setJumpPage(String(page));
+  }, [page]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const handleJumpSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextPage = Number(jumpPage);
+    if (!Number.isFinite(nextPage)) return;
+    setPage(Math.min(totalPages, Math.max(1, Math.trunc(nextPage))));
+  };
+
+  const sourceOptions = useMemo(
+    () => Object.keys(stats?.sources ?? {}).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+    [stats?.sources],
+  );
+
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const baseYears = Array.from({ length: 10 }, (_, index) => String(currentYear - index));
+    const loadedYears = allYearTenders.map(getTenderYear).filter(Boolean);
+    return Array.from(new Set([...baseYears, ...loadedYears])).sort((a, b) => Number(b) - Number(a));
+  }, [allYearTenders]);
 
   // Stat cards
   const statCards = [
@@ -162,12 +308,20 @@ export default function TendersPage() {
         search={search}
         sector={sector}
         state={state}
+        year={year}
+        sourceName={sourceName}
+        pageSize={pageSize}
+        yearOptions={yearOptions}
+        sourceOptions={sourceOptions}
         onSearch={handleSearch}
         onSector={handleSector}
         onState={handleState}
+        onYear={handleYear}
+        onSource={handleSource}
+        onPageSize={handlePageSize}
         onClear={handleClear}
         totalResults={total}
-        loading={isLoading}
+        loading={isListLoading}
       />
 
       {/* ── Tabs ── */}
@@ -191,7 +345,7 @@ export default function TendersPage() {
       <div className={styles.listWrap}>
 
         {/* Loading skeletons */}
-        {isLoading && (
+        {isListLoading && (
           <div className={styles.skeletonList}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className={styles.skeletonCard}>
@@ -211,7 +365,7 @@ export default function TendersPage() {
         )}
 
         {/* Error */}
-        {isError && !isLoading && (
+        {isListError && !isListLoading && (
           <div className={styles.emptyState}>
             <AlertCircle size={32} className={styles.emptyIcon} style={{ color: '#F87171' }} />
             <p className={styles.emptyTitle}>Could not load tenders</p>
@@ -220,7 +374,7 @@ export default function TendersPage() {
         )}
 
         {/* Empty */}
-        {!isLoading && !isError && tenders.length === 0 && (
+        {!isListLoading && !isListError && tenders.length === 0 && (
           <div className={styles.emptyState}>
             <Inbox size={36} className={styles.emptyIcon} />
             <p className={styles.emptyTitle}>No tenders found</p>
@@ -229,7 +383,7 @@ export default function TendersPage() {
                 ? 'No live tenders — your data source contains historical closed contracts'
                 : 'Try adjusting your filters'}
             </p>
-            {(search || sector || state) && (
+            {(search || sector || state || year || sourceName) && (
               <button className={styles.clearFiltersBtn} onClick={handleClear}>
                 Clear filters
               </button>
@@ -238,7 +392,7 @@ export default function TendersPage() {
         )}
 
         {/* Cards */}
-        {!isLoading && !isError && tenders.length > 0 && (
+        {!isListLoading && !isListError && tenders.length > 0 && (
           <div className={styles.cardList}>
             {tenders.map((tender, i) => (
               <TenderCard
@@ -252,39 +406,55 @@ export default function TendersPage() {
         )}
 
         {/* Pagination */}
-        {!isLoading && !isError && totalPages > 1 && (
+        {!isListLoading && !isListError && totalPages > 1 && (
           <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              disabled={page === 1}
-              onClick={() => setPage(p => p - 1)}
-            >
-              ← Prev
-            </button>
+            <div className={styles.pageMain}>
+              <button
+                className={styles.pageBtn}
+                disabled={page === 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+              >
+                Prev
+              </button>
 
-            <div className={styles.pageNumbers}>
-              {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
-                const p = i + 1;
-                return (
-                  <button
-                    key={p}
-                    className={clsx(styles.pageNum, page === p && styles.pageNumActive)}
-                    onClick={() => setPage(p)}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-              {totalPages > 7 && <span className={styles.pageDots}>…{totalPages}</span>}
+              <div className={styles.pageNumbers}>
+                {visiblePages.map((pageItem) => (
+                  typeof pageItem === 'number' ? (
+                    <button
+                      key={pageItem}
+                      className={clsx(styles.pageNum, page === pageItem && styles.pageNumActive)}
+                      onClick={() => setPage(pageItem)}
+                    >
+                      {pageItem}
+                    </button>
+                  ) : (
+                    <span key={pageItem} className={styles.pageDots}>...</span>
+                  )
+                ))}
+              </div>
+
+              <button
+                className={styles.pageBtn}
+                disabled={page === totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
             </div>
 
-            <button
-              className={styles.pageBtn}
-              disabled={page === totalPages}
-              onClick={() => setPage(p => p + 1)}
-            >
-              Next →
-            </button>
+            <form className={styles.pageJump} onSubmit={handleJumpSubmit}>
+              <span className={styles.pageJumpLabel}>Go to</span>
+              <input
+                className={styles.pageJumpInput}
+                type="number"
+                min={1}
+                max={totalPages}
+                value={jumpPage}
+                onChange={(event) => setJumpPage(event.target.value)}
+              />
+              <span className={styles.pageJumpLabel}>/ {totalPages}</span>
+              <button className={styles.pageJumpBtn} type="submit">Go</button>
+            </form>
           </div>
         )}
       </div>
