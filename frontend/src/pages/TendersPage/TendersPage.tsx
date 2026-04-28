@@ -18,6 +18,15 @@ import clsx from 'clsx';
 
 type Tab = 'active' | 'upcoming' | 'closed';
 
+const SOURCE_LABEL: Record<string, string> = {
+  austender:   'AusTender',
+  tendersnet:  'Tenders.Net',
+  qld_tenders: 'QLD Tenders',
+  nsw_etender: 'NSW eTender',
+};
+
+const getSourceLabel = (s: string) => SOURCE_LABEL[s] ?? s.replace(/_/g, ' ');
+
 const STATUS_CARDS: {
   id: Tab;
   label: string;
@@ -28,49 +37,53 @@ const STATUS_CARDS: {
   border: string;
   countKey: 'active_tenders' | 'upcoming_tenders' | 'closed_tenders';
   valueKey: 'active_value' | 'upcoming_value' | 'closed_value';
+  statusKeys: string[];
 }[] = [
   {
-    id:       'active',
-    label:    'Active Bids',
-    desc:     'Open Tender Bids — Accepting Submissions Now',
-    icon:     Activity,
-    color:    '#10B981',
-    bg:       'rgba(16,185,129,0.07)',
-    border:   'rgba(16,185,129,0.22)',
-    countKey: 'active_tenders',
-    valueKey: 'active_value',
+    id:         'active',
+    label:      'Active Bids',
+    desc:       'Open — accepting submissions now',
+    icon:       Activity,
+    color:      '#10B981',
+    bg:         'rgba(16,185,129,0.07)',
+    border:     'rgba(16,185,129,0.22)',
+    countKey:   'active_tenders',
+    valueKey:   'active_value',
+    statusKeys: ['open', 'active'],
   },
   {
-    id:       'upcoming',
-    label:    'Upcoming Bids',
-    desc:     'Planned Tender Bids — Not Yet Released',
-    icon:     Clock,
-    color:    '#F59E0B',
-    bg:       'rgba(245,158,11,0.07)',
-    border:   'rgba(245,158,11,0.22)',
-    countKey: 'upcoming_tenders',
-    valueKey: 'upcoming_value',
+    id:         'upcoming',
+    label:      'Upcoming Bids',
+    desc:       'Planned — not yet released',
+    icon:       Clock,
+    color:      '#F59E0B',
+    bg:         'rgba(245,158,11,0.07)',
+    border:     'rgba(245,158,11,0.22)',
+    countKey:   'upcoming_tenders',
+    valueKey:   'upcoming_value',
+    statusKeys: ['upcoming'],
   },
   {
-    id:       'closed',
-    label:    'Closed Bids',
-    desc:     'Awarded Tender Bids — Historical Tenders',
-    icon:     CheckCircle2,
-    color:    '#6366F1',
-    bg:       'rgba(99,102,241,0.07)',
-    border:   'rgba(99,102,241,0.22)',
-    countKey: 'closed_tenders',
-    valueKey: 'closed_value',
+    id:         'closed',
+    label:      'Closed Bids',
+    desc:       'Awarded — historical contracts',
+    icon:       CheckCircle2,
+    color:      '#6366F1',
+    bg:         'rgba(99,102,241,0.07)',
+    border:     'rgba(99,102,241,0.22)',
+    countKey:   'closed_tenders',
+    valueKey:   'closed_value',
+    statusKeys: ['closed'],
   },
 ];
 
 export default function TendersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab]         = useState<Tab>('active');
-  const [sector, setSector]               = useState('');
-  const [state, setState]                 = useState('');
-  const [source, setSource]               = useState('');
-  const [page, setPage]                   = useState(1);
+  const [activeTab, setActiveTab]           = useState<Tab>('active');
+  const [sector, setSector]                 = useState('');
+  const [state, setState]                   = useState('');
+  const [source, setSource]                 = useState('');
+  const [page, setPage]                     = useState(1);
   const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
 
   const search = searchParams.get('search') ?? '';
@@ -89,7 +102,7 @@ export default function TendersPage() {
   const handleSector = useCallback((v: string) => { setSector(v);  setPage(1); }, []);
   const handleState  = useCallback((v: string) => { setState(v);   setPage(1); }, []);
   const handleSource = useCallback((v: string) => { setSource(v);  setPage(1); }, []);
-  const handleTab    = useCallback((t: Tab)    => { setActiveTab(t); setPage(1); }, []);
+  const handleTab    = useCallback((t: Tab)    => { setActiveTab(t); setSource(''); setPage(1); }, []);
 
   const handleClear = useCallback(() => {
     setSearch(''); setSector(''); setState(''); setSource(''); setPage(1);
@@ -97,7 +110,7 @@ export default function TendersPage() {
 
   const filters = {
     page,
-    page_size: 15,
+    page_size:   15,
     status:      activeTab === 'active' ? 'open' : activeTab,
     sector:      sector || undefined,
     state:       state  || undefined,
@@ -115,10 +128,10 @@ export default function TendersPage() {
 
   const exportCSV = () => {
     if (!tenders.length) return;
-    const headers = ['Title','Agency','Sector','State','Value','Close Date','Status','Source'];
+    const headers = ['Title', 'Agency', 'Sector', 'State', 'Value', 'Close Date', 'Status', 'Source'];
     const rows = tenders.map(t => [
-      `"${t.title.replace(/"/g,"'")}"`,
-      `"${t.agency.replace(/"/g,"'")}"`,
+      `"${t.title.replace(/"/g, "'")}"`,
+      `"${t.agency.replace(/"/g, "'")}"`,
       t.sector ?? '',
       t.state  ?? '',
       t.contract_value ?? '',
@@ -136,7 +149,24 @@ export default function TendersPage() {
     URL.revokeObjectURL(url);
   };
 
-  const activeCard = STATUS_CARDS.find(c => c.id === activeTab)!;
+  // Compute displayed value for a card given selected source
+  const getDisplayValue = (card: typeof STATUS_CARDS[0], selectedSource: string, isCardActive: boolean) => {
+    if (!stats && !sourceStats) return '…';
+    // If source filter active on this card — show that source's value
+    if (isCardActive && selectedSource && sourceStats) {
+      const srcData = sourceStats[selectedSource];
+      if (srcData) {
+        const v = card.statusKeys.reduce((sum, k) => sum + (srcData[k]?.value ?? 0), 0);
+        return v > 0 ? formatCurrency(v) : 'Not disclosed';
+      }
+      return 'Not disclosed';
+    }
+    // No source selected — show total value for this card status
+    const total = stats?.[card.valueKey] ?? 0;
+    return total > 0 ? formatCurrency(total) : 'Not disclosed';
+  };
+
+  const activeCardDef = STATUS_CARDS.find(c => c.id === activeTab)!;
 
   return (
     <div className={`${styles.page} page-enter`}>
@@ -145,7 +175,7 @@ export default function TendersPage() {
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.heading}>Tender Management</h2>
-          <p className={styles.headingSub}>Track and Manage Australian Government Tenders</p>
+          <p className={styles.headingSub}>Track and manage Australian government contracts</p>
         </div>
         <button className={styles.exportBtn} onClick={exportCSV}>
           <Download size={14} />
@@ -189,20 +219,22 @@ export default function TendersPage() {
         </div>
       </motion.div>
 
-      {/* ── Status filter cards (Active / Upcoming / Closed) ── */}
+      {/* ── Status filter cards ── */}
       <div className={styles.statusGrid}>
         {STATUS_CARDS.map((card, i) => {
           const isActive = activeTab === card.id;
           const count    = stats?.[card.countKey] ?? 0;
-          const value    = stats?.[card.valueKey] ?? 0;
+
           return (
             <motion.button
               key={card.id}
-              className={styles.statusCard}
+              className={clsx(styles.statusCard, isActive && styles.statusCardActive)}
               style={{
-                background:   isActive ? card.bg    : 'var(--card-bg)',
-                borderColor:  isActive ? card.color : 'var(--card-border)',
-                boxShadow:    isActive ? `0 0 0 1px ${card.color}55, 0 4px 24px ${card.color}22` : 'none',
+                background:  isActive ? card.bg    : 'var(--card-bg)',
+                borderColor: isActive ? card.color : 'var(--card-border)',
+                boxShadow:   isActive
+                  ? `0 0 0 1px ${card.color}55, 0 4px 24px ${card.color}22`
+                  : 'none',
               }}
               onClick={() => handleTab(card.id)}
               initial={{ opacity: 0, y: 16 }}
@@ -228,7 +260,11 @@ export default function TendersPage() {
                 {isActive && (
                   <motion.span
                     className={styles.scActivePill}
-                    style={{ background: card.color + '22', color: card.color, border: `1px solid ${card.color}44` }}
+                    style={{
+                      background: card.color + '22',
+                      color:      card.color,
+                      border:     `1px solid ${card.color}44`,
+                    }}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                   >
@@ -244,64 +280,40 @@ export default function TendersPage() {
 
               <p className={styles.scDesc}>{card.desc}</p>
 
-              {/* Divider */}
               <div className={styles.scDivider} style={{ background: isActive ? card.color + '33' : 'var(--border)' }} />
 
-              {/* Value — source breakdown for active, total for others */}
-              {card.id === 'active' ? (
-                <div className={styles.scSourceBreakdown}>
-                  {sourceStats
-                    ? Object.entries(sourceStats)
-                        .filter(([, statuses]) => 'open' in statuses || 'active' in statuses)
-                        .map(([srcName, statuses]) => {
-                          const d = statuses['open'] ?? statuses['active'] ?? { count: 0, value: 0 };
-                          const label =
-                            srcName === 'austender'   ? 'AusTender'   :
-                            srcName === 'tendersnet'  ? 'Tenders.Net' :
-                            srcName === 'qld_tenders' ? 'QLD Tenders' :
-                            srcName.replace(/_/g, ' ');
-                          return (
-                            <div key={srcName} className={styles.scBreakdownRow}>
-                              <span className={styles.scBreakdownSrc}>{label}</span>
-                              <span className={styles.scBreakdownCount}>{formatNumber(d.count)} tenders</span>
-                              <span className={styles.scBreakdownVal} style={{ color: card.color }}>
-                                {d.value > 0 ? formatCurrency(d.value) : 'Not disclosed'}
-                              </span>
-                            </div>
-                          );
-                        })
-                    : <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Loading…</span>
-                  }
-                </div>
-              ) : (
-                <div className={styles.scValueRow}>
-                  <span className={styles.scValueLabel}>Total Value</span>
-                  <span className={styles.scValue} style={{ color: isActive ? card.color : 'var(--text-secondary)' }}>
-                    {stats ? (value > 0 ? formatCurrency(value) : 'Not disclosed') : '…'}
-                  </span>
-                </div>
-              )}
-
-              {/* Source filter row */}
+              {/* Source filter dropdown */}
               <div className={styles.scSourceRow} onClick={e => e.stopPropagation()}>
-                <span className={styles.scSourceLabel}>Filter Source:</span>
+                <span className={styles.scSourceLabel}>Source:</span>
                 <select
                   className={styles.scSourceSelect}
                   value={isActive ? source : ''}
-                  onChange={e => { handleTab(card.id); handleSource(e.target.value); }}
+                  onChange={e => {
+                    handleTab(card.id);
+                    handleSource(e.target.value);
+                  }}
                   style={{ borderColor: isActive ? card.color + '44' : 'var(--border)' }}
                 >
                   <option value="">All Sources</option>
                   {Object.keys(stats?.sources ?? {}).map(s => (
-                    <option key={s} value={s}>
-                      {s === 'austender' ? 'AusTender' :
-                       s === 'tendersnet' ? 'Tenders.Net' :
-                       s === 'qld_tenders' ? 'QLD Tenders' :
-                       s.replace(/_/g, ' ')}
-                    </option>
+                    <option key={s} value={s}>{getSourceLabel(s)}</option>
                   ))}
                 </select>
               </div>
+
+              {/* Value — updates based on selected source */}
+              <div className={styles.scValueRow}>
+                <span className={styles.scValueLabel}>
+                  {isActive && source ? `${getSourceLabel(source)} value` : 'Total value'}
+                </span>
+                <span
+                  className={styles.scValue}
+                  style={{ color: isActive ? card.color : 'var(--text-secondary)' }}
+                >
+                  {getDisplayValue(card, isActive ? source : '', isActive)}
+                </span>
+              </div>
+
             </motion.button>
           );
         })}
@@ -322,10 +334,21 @@ export default function TendersPage() {
 
       {/* ── Active tab label ── */}
       <div className={styles.activeTabLabel}>
-        <activeCard.icon size={14} style={{ color: activeCard.color }} />
-        <span style={{ color: activeCard.color, fontWeight: 600 }}>{activeCard.label}</span>
+        <activeCardDef.icon size={14} style={{ color: activeCardDef.color }} />
+        <span style={{ color: activeCardDef.color, fontWeight: 600 }}>{activeCardDef.label}</span>
+        {source && (
+          <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+            · {getSourceLabel(source)}
+          </span>
+        )}
         {total > 0 && (
-          <span className={styles.activeTabCount} style={{ background: activeCard.color + '22', color: activeCard.color }}>
+          <span
+            className={styles.activeTabCount}
+            style={{
+              background: activeCardDef.color + '22',
+              color:      activeCardDef.color,
+            }}
+          >
             {formatNumber(total)} results
           </span>
         )}
@@ -394,7 +417,11 @@ export default function TendersPage() {
 
         {!isLoading && !isError && totalPages > 1 && (
           <div className={styles.pagination}>
-            <button className={styles.pageBtn} disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+            <button
+              className={styles.pageBtn}
+              disabled={page === 1}
+              onClick={() => setPage(p => p - 1)}
+            >
               ← Prev
             </button>
             <div className={styles.pageNumbers}>
@@ -412,7 +439,11 @@ export default function TendersPage() {
               })}
               {totalPages > 10 && <span className={styles.pageDots}>…{totalPages}</span>}
             </div>
-            <button className={styles.pageBtn} disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
+            <button
+              className={styles.pageBtn}
+              disabled={page === totalPages}
+              onClick={() => setPage(p => p + 1)}
+            >
               Next →
             </button>
           </div>
@@ -420,7 +451,10 @@ export default function TendersPage() {
       </div>
 
       {selectedTender && (
-        <TenderDetailModal tender={selectedTender} onClose={() => setSelectedTender(null)} />
+        <TenderDetailModal
+          tender={selectedTender}
+          onClose={() => setSelectedTender(null)}
+        />
       )}
     </div>
   );
