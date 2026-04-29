@@ -11,7 +11,7 @@ import { tendersApi } from '../../api/endpoints/tenders.api';
 import { useTenders, useOverviewStats, useSourceStats } from '../../hooks/useTenders';
 import { useDebounce } from '../../hooks/useDebounce';
 import TenderCard from '../../components/tenders/TenderCard';
-import TenderFilters, { type PageSize } from '../../components/tenders/TenderFilters';
+import TenderFilters, { type PageSize, type YearMode } from '../../components/tenders/TenderFilters';
 import TenderDetailModal from '../../components/tenders/TenderDetailModal';
 import type { Tender } from '../../types/tender.types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
@@ -119,10 +119,15 @@ const getVisiblePages = (currentPage: number, totalPages: number): PageItem[] =>
 
 export default function TendersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const yearParam = searchParams.get('year') ?? '';
+  const publishedYearParam = searchParams.get('published_year') ?? '';
+  const urlYear = publishedYearParam || yearParam;
+  const urlYearMode: YearMode = publishedYearParam ? 'published' : 'close';
   const [activeTab, setActiveTab]         = useState<Tab>('active');
   const [sector, setSector]               = useState('');
   const [state, setState]                 = useState('');
-  const [year, setYear]                   = useState('');
+  const [yearMode, setYearMode]           = useState<YearMode>(urlYearMode);
+  const [year, setYear]                   = useState(urlYear);
   const [sourceName, setSourceName]       = useState('');
   const [pageSize, setPageSize]           = useState<PageSize>('15');
   const [page, setPage]                   = useState(1);
@@ -139,19 +144,38 @@ export default function TendersPage() {
     }, { replace: true });
   }, [setSearchParams]);
 
+  const setYearFilter = useCallback((next: string, mode: YearMode = yearMode) => {
+    setSearchParams(prev => {
+      const params = new URLSearchParams(prev);
+      params.delete('year');
+      params.delete('published_year');
+      if (next.trim()) {
+        params.set(mode === 'published' ? 'published_year' : 'year', next);
+      }
+      return params;
+    }, { replace: true });
+  }, [setSearchParams, yearMode]);
+
   const debouncedSearch = useDebounce(search, 400);
+
+  useEffect(() => {
+    setYearMode(urlYearMode);
+    setYear(urlYear);
+    setPage(1);
+  }, [urlYear, urlYearMode]);
 
   const handleSearch = useCallback((v: string) => { setSearch(v);  setPage(1); }, [setSearch]);
   const handleSector = useCallback((v: string) => { setSector(v);  setPage(1); }, []);
   const handleState  = useCallback((v: string) => { setState(v);   setPage(1); }, []);
-  const handleYear   = useCallback((v: string) => { setYear(v);    setPage(1); }, []);
+  const handleYearMode = useCallback((v: YearMode) => { setYearMode(v); setYearFilter(year, v); setPage(1); }, [setYearFilter, year]);
+  const handleYear   = useCallback((v: string) => { setYear(v); setYearFilter(v); setPage(1); }, [setYearFilter]);
   const handleSource = useCallback((v: string) => { setSourceName(v); setPage(1); }, []);
   const handlePageSize = useCallback((v: PageSize) => { setPageSize(v); setPage(1); }, []);
   const handleTab    = useCallback((t: Tab)    => { setActiveTab(t); setPage(1); }, []);
 
   const handleClear = useCallback(() => {
-    setSearch(''); setSector(''); setState(''); setYear(''); setSourceName(''); setPage(1);
-  }, [setSearch]);
+    setSearch(''); setSector(''); setState(''); setYearMode('close'); setYear(''); setYearFilter('', 'close'); setSourceName(''); setPage(1);
+  }, [setSearch, setYearFilter]);
 
   const hasYearFilter = Boolean(year);
   const pageSizeNumber = Number(pageSize);
@@ -214,16 +238,17 @@ export default function TendersPage() {
   const isListError = isError;
 
   const getTenderYear = (tender: Tender) => {
-    if (!tender.close_date) return '';
+    const dateValue = yearMode === 'published' ? tender.published_date : tender.close_date;
+    if (!dateValue) return '';
 
-    const parsed = new Date(tender.close_date);
+    const parsed = new Date(dateValue);
     return Number.isNaN(parsed.getTime()) ? '' : String(parsed.getFullYear());
   };
 
   const yearFilteredTenders = useMemo(() => {
     if (!year) return needsFullDataset ? allYearTenders : rawTenders;
     return allYearTenders.filter((tender) => getTenderYear(tender) === year);
-  }, [allYearTenders, needsFullDataset, rawTenders, year]);
+  }, [allYearTenders, needsFullDataset, rawTenders, year, yearMode]);
 
   const tenders = needsFullDataset
     ? yearFilteredTenders.slice((page - 1) * pageSizeNumber, page * pageSizeNumber)
@@ -262,7 +287,7 @@ export default function TendersPage() {
     const baseYears = Array.from({ length: 10 }, (_, index) => String(currentYear - index));
     const loadedYears = allYearTenders.map(getTenderYear).filter(Boolean);
     return Array.from(new Set([...baseYears, ...loadedYears])).sort((a, b) => Number(b) - Number(a));
-  }, [allYearTenders]);
+  }, [allYearTenders, yearMode]);
 
   const exportCSV = () => {
     if (!tenders.length) return;
@@ -462,6 +487,7 @@ export default function TendersPage() {
         search={search}
         sector={sector}
         state={state}
+        yearMode={yearMode}
         year={year}
         sourceName={sourceName}
         pageSize={pageSize}
@@ -470,6 +496,7 @@ export default function TendersPage() {
         onSearch={handleSearch}
         onSector={handleSector}
         onState={handleState}
+        onYearMode={handleYearMode}
         onYear={handleYear}
         onSource={handleSource}
         onPageSize={handlePageSize}

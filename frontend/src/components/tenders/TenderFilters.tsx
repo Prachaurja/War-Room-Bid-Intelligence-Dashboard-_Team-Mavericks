@@ -2,6 +2,7 @@ import { Search, X, SlidersHorizontal } from 'lucide-react';
 import styles from './TenderFilters.module.css';
 
 export type PageSize = '15' | '25' | '50' | '100';
+export type YearMode = 'close' | 'published';
 
 const SECTORS = [
   { value: '', label: 'All Sectors' },
@@ -58,6 +59,7 @@ interface TenderFiltersProps {
   search: string;
   sector: string;
   state: string;
+  yearMode: YearMode;
   year: string;
   sourceName: string;
   pageSize: PageSize;
@@ -66,6 +68,7 @@ interface TenderFiltersProps {
   onSearch: (v: string) => void;
   onSector: (v: string) => void;
   onState: (v: string) => void;
+  onYearMode: (v: YearMode) => void;
   onYear: (v: string) => void;
   onSource: (v: string) => void;
   onPageSize: (v: PageSize) => void;
@@ -78,6 +81,7 @@ export default function TenderFilters({
   search,
   sector,
   state,
+  yearMode,
   year,
   sourceName,
   pageSize,
@@ -86,6 +90,7 @@ export default function TenderFilters({
   onSearch,
   onSector,
   onState,
+  onYearMode,
   onYear,
   onSource,
   onPageSize,
@@ -157,6 +162,15 @@ export default function TenderFilters({
           {STATES.map((item) => (
             <option key={item.value} value={item.value}>{item.label}</option>
           ))}
+        </select>
+
+        <select
+          className={styles.select}
+          value={yearMode}
+          onChange={(event) => onYearMode(event.target.value as YearMode)}
+        >
+          <option value="close">Close Year</option>
+          <option value="published">Published Year</option>
         </select>
 
         <select

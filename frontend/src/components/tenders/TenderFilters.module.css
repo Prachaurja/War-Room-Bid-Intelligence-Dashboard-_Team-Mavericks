@@ -76,7 +76,7 @@
   /* Controls row */
   .controls {
     display: grid;
-    grid-template-columns: minmax(220px, 1fr) 155px 120px 115px minmax(150px, 180px) 130px;
+    grid-template-columns: minmax(220px, 1fr) 145px 105px 125px 115px minmax(145px, 170px) 125px;
     gap: 10px;
   }
   
