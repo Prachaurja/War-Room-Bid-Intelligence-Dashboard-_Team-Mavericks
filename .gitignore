@@ -59,3 +59,9 @@ frontend/build/
 __pycache__/
 *.py[cod]
 *.pyo
+
+# Deployment secrets
+secret.yaml
+k8s/secret.yaml
+deploy/k8s/secret.yaml
+deploy/backend.env

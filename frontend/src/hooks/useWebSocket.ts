@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/auth.store';
 
-const WS_URL = import.meta.env.VITE_API_URL?.replace('http', 'ws') ?? 'ws://localhost:8000';
+const WS_URL = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace('http', 'ws')
+  : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
 
 export type WsStatus = 'connecting' | 'connected' | 'disconnected';
 
