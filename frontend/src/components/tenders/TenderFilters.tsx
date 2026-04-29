@@ -1,7 +1,7 @@
 import { Search, X, SlidersHorizontal } from 'lucide-react';
 import styles from './TenderFilters.module.css';
 
-export type PageSize = '15' | '25' | '50' | '100' | 'all';
+export type PageSize = '15' | '25' | '50' | '100';
 
 const SECTORS = [
   { value: '', label: 'All Sectors' },

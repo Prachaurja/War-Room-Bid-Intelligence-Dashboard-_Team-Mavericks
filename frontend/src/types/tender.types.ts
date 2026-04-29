@@ -58,6 +58,9 @@ export interface OverviewStats {
   upcoming_tenders: number;
   total_value: number;
   avg_value: number;
+  active_value: number;
+  closed_value: number;
+  upcoming_value: number;
   sources: Record<string, number>;
 }
 
@@ -72,3 +75,12 @@ export interface StateStat {
   count: number;
   total_value: number;
 }
+
+/** Per-status count/value for one source (keys are status strings, e.g. open, closed). */
+export interface SourceStatusBreakdown {
+  count: number;
+  value: number;
+}
+
+/** Nested map: source_name → status → { count, value } */
+export type SourceStatsBySource = Record<string, Record<string, SourceStatusBreakdown>>;

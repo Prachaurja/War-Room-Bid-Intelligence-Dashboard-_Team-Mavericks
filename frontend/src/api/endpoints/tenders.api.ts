@@ -1,5 +1,12 @@
 import apiClient from '../client';
-import type { TenderListResponse, TenderFilters, OverviewStats, SectorStat, StateStat } from '../../types/tender.types';
+import type {
+  TenderListResponse,
+  TenderFilters,
+  OverviewStats,
+  SectorStat,
+  StateStat,
+  SourceStatsBySource,
+} from '../../types/tender.types';
 
 export const tendersApi = {
   list: (filters: TenderFilters = {}) =>
@@ -16,4 +23,7 @@ export const tendersApi = {
 
   byState: () =>
     apiClient.get<StateStat[]>('/tenders/stats/by-state').then(r => r.data),
+
+  bySource: () =>
+    apiClient.get<SourceStatsBySource>('/tenders/stats/by-source').then(r => r.data),
 };

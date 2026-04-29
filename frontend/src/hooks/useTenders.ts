@@ -1,7 +1,14 @@
 // ── useTenders.ts ────────────────────────────────────────────
 import { useQuery } from '@tanstack/react-query';
 import { tendersApi } from '../api/endpoints/tenders.api';
-import type { TenderFilters, TenderListResponse, OverviewStats, SectorStat, StateStat } from '../types/tender.types';
+import type {
+  TenderFilters,
+  TenderListResponse,
+  OverviewStats,
+  SectorStat,
+  StateStat,
+  SourceStatsBySource,
+} from '../types/tender.types';
 
 export function useTenders(filters: TenderFilters = {}) {
   return useQuery<TenderListResponse>({
@@ -33,6 +40,13 @@ export function useStateStats() {
   return useQuery<StateStat[]>({
     queryKey: ['state-stats'],
     queryFn: tendersApi.byState,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+export function useSourceStats() {
+  return useQuery<SourceStatsBySource>({
+    queryKey: ['source-stats'],
+    queryFn: tendersApi.bySource,
     staleTime: 5 * 60 * 1000,
   });
 }

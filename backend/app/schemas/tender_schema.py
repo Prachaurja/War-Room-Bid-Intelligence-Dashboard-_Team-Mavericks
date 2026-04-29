@@ -51,4 +51,7 @@ class OverviewStats(BaseModel):
     upcoming_tenders: int
     total_value: float
     avg_value: float
+    active_value: float
+    closed_value: float
+    upcoming_value: float
     sources: Dict[str, int]

@@ -4,11 +4,11 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Download, AlertCircle, Clock,
-  CheckCircle2, Layers, DollarSign,
-  TrendingUp, Inbox,
+  CheckCircle2, DollarSign,
+  Activity, Inbox,
 } from 'lucide-react';
 import { tendersApi } from '../../api/endpoints/tenders.api';
-import { useTenders, useOverviewStats } from '../../hooks/useTenders';
+import { useTenders, useOverviewStats, useSourceStats } from '../../hooks/useTenders';
 import { useDebounce } from '../../hooks/useDebounce';
 import TenderCard from '../../components/tenders/TenderCard';
 import TenderFilters, { type PageSize } from '../../components/tenders/TenderFilters';
@@ -21,10 +21,63 @@ import clsx from 'clsx';
 type Tab = 'active' | 'upcoming' | 'closed';
 type PageItem = number | 'dots-left' | 'dots-right';
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'active',   label: 'Active Bids', icon: AlertCircle  },
-  { id: 'upcoming', label: 'Upcoming Bids',    icon: Clock        },
-  { id: 'closed',   label: 'Closed Bids',      icon: CheckCircle2 },
+const SOURCE_LABEL: Record<string, string> = {
+  austender:   'AusTender',
+  tendersnet:  'Tenders.Net',
+  qld_tenders: 'QLD Tenders',
+  nsw_etender: 'NSW eTender',
+};
+
+const getSourceLabel = (s: string) => SOURCE_LABEL[s] ?? s.replace(/_/g, ' ');
+
+const STATUS_CARDS: {
+  id: Tab;
+  label: string;
+  desc: string;
+  icon: React.ElementType;
+  color: string;
+  bg: string;
+  border: string;
+  countKey: 'active_tenders' | 'upcoming_tenders' | 'closed_tenders';
+  valueKey: 'active_value' | 'upcoming_value' | 'closed_value';
+  statusKeys: string[];
+}[] = [
+  {
+    id:         'active',
+    label:      'Active Bids',
+    desc:       'Open — accepting submissions now',
+    icon:       Activity,
+    color:      '#10B981',
+    bg:         'rgba(16,185,129,0.07)',
+    border:     'rgba(16,185,129,0.22)',
+    countKey:   'active_tenders',
+    valueKey:   'active_value',
+    statusKeys: ['open', 'active'],
+  },
+  {
+    id:         'upcoming',
+    label:      'Upcoming Bids',
+    desc:       'Planned — not yet released',
+    icon:       Clock,
+    color:      '#F59E0B',
+    bg:         'rgba(245,158,11,0.07)',
+    border:     'rgba(245,158,11,0.22)',
+    countKey:   'upcoming_tenders',
+    valueKey:   'upcoming_value',
+    statusKeys: ['upcoming'],
+  },
+  {
+    id:         'closed',
+    label:      'Closed Bids',
+    desc:       'Awarded — historical contracts',
+    icon:       CheckCircle2,
+    color:      '#6366F1',
+    bg:         'rgba(99,102,241,0.07)',
+    border:     'rgba(99,102,241,0.22)',
+    countKey:   'closed_tenders',
+    valueKey:   'closed_value',
+    statusKeys: ['closed'],
+  },
 ];
 
 const getVisiblePages = (currentPage: number, totalPages: number): PageItem[] => {
@@ -66,7 +119,7 @@ const getVisiblePages = (currentPage: number, totalPages: number): PageItem[] =>
 
 export default function TendersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab]         = useState<Tab>('upcoming');
+  const [activeTab, setActiveTab]         = useState<Tab>('active');
   const [sector, setSector]               = useState('');
   const [state, setState]                 = useState('');
   const [year, setYear]                   = useState('');
@@ -88,7 +141,6 @@ export default function TendersPage() {
 
   const debouncedSearch = useDebounce(search, 400);
 
-  // When filters change, reset to page 1
   const handleSearch = useCallback((v: string) => { setSearch(v);  setPage(1); }, [setSearch]);
   const handleSector = useCallback((v: string) => { setSector(v);  setPage(1); }, []);
   const handleState  = useCallback((v: string) => { setState(v);   setPage(1); }, []);
@@ -102,9 +154,8 @@ export default function TendersPage() {
   }, [setSearch]);
 
   const hasYearFilter = Boolean(year);
-  const showAllResults = pageSize === 'all';
-  const pageSizeNumber = showAllResults ? 100 : Number(pageSize);
-  const needsFullDataset = hasYearFilter || showAllResults;
+  const pageSizeNumber = Number(pageSize);
+  const needsFullDataset = hasYearFilter;
 
   const filters = {
     page:       needsFullDataset ? 1 : page,
@@ -118,6 +169,7 @@ export default function TendersPage() {
 
   const { data, isLoading, isError } = useTenders(filters);
   const { data: stats }              = useOverviewStats();
+  const { data: sourceStats }        = useSourceStats();
 
   const rawTenders = data?.items ?? [];
   const yearFetchFilters = {
@@ -173,18 +225,14 @@ export default function TendersPage() {
     return allYearTenders.filter((tender) => getTenderYear(tender) === year);
   }, [allYearTenders, needsFullDataset, rawTenders, year]);
 
-  const tenders = showAllResults
-    ? yearFilteredTenders
-    : needsFullDataset
-      ? yearFilteredTenders.slice((page - 1) * pageSizeNumber, page * pageSizeNumber)
+  const tenders = needsFullDataset
+    ? yearFilteredTenders.slice((page - 1) * pageSizeNumber, page * pageSizeNumber)
     : rawTenders;
 
   const total = needsFullDataset ? yearFilteredTenders.length : data?.total ?? 0;
-  const totalPages = showAllResults
-    ? 1
-    : needsFullDataset
-      ? Math.max(1, Math.ceil(total / pageSizeNumber))
-      : data?.total_pages ?? 1;
+  const totalPages = needsFullDataset
+    ? Math.max(1, Math.ceil(total / pageSizeNumber))
+    : data?.total_pages ?? 1;
   const visiblePages = useMemo(() => getVisiblePages(page, totalPages), [page, totalPages]);
 
   useEffect(() => {
@@ -216,46 +264,18 @@ export default function TendersPage() {
     return Array.from(new Set([...baseYears, ...loadedYears])).sort((a, b) => Number(b) - Number(a));
   }, [allYearTenders]);
 
-  // Stat cards
-  const statCards = [
-    {
-      label:    'Total Contracts',
-      value:    formatNumber(stats?.total_tenders),
-      icon:     Layers,
-      gradient: 'linear-gradient(135deg,#7C3AED,#4F46E5)',
-    },
-    {
-      label:    'Total Value',
-      value:    formatCurrency(stats?.total_value),
-      icon:     DollarSign,
-      gradient: 'linear-gradient(135deg,#3B82F6,#06B6D4)',
-    },
-    {
-      label:    'Active Bids',
-      value:    formatNumber(stats?.active_tenders ?? 0),
-      icon:     TrendingUp,
-      gradient: 'linear-gradient(135deg,#10B981,#059669)',
-    },
-    {
-      label:    'Closed Bids',
-      value:    formatNumber(stats?.closed_tenders),
-      icon:     CheckCircle2,
-      gradient: 'linear-gradient(135deg,#F59E0B,#EF4444)',
-    },
-  ];
-
   const exportCSV = () => {
     if (!tenders.length) return;
-    const headers = ['Title','Agency','Sector','State','Value','Close Date','Status','Source ID'];
+    const headers = ['Title', 'Agency', 'Sector', 'State', 'Value', 'Close Date', 'Status', 'Source'];
     const rows = tenders.map(t => [
-      `"${t.title.replace(/"/g,"'")}"`,
-      `"${t.agency.replace(/"/g,"'")}"`,
+      `"${t.title.replace(/"/g, "'")}"`,
+      `"${t.agency.replace(/"/g, "'")}"`,
       t.sector ?? '',
       t.state  ?? '',
       t.contract_value ?? '',
       t.close_date     ?? '',
       t.status,
-      t.source_id,
+      t.source_name ?? '',
     ]);
     const csv  = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -267,6 +287,25 @@ export default function TendersPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Compute displayed value for a card given selected source
+  const getDisplayValue = (card: typeof STATUS_CARDS[0], selectedSource: string, isCardActive: boolean) => {
+    if (!stats && !sourceStats) return '…';
+    // If source filter active on this card — show that source's value
+    if (isCardActive && selectedSource && sourceStats) {
+      const srcData = sourceStats[selectedSource];
+      if (srcData) {
+        const v = card.statusKeys.reduce((sum, k) => sum + (srcData[k]?.value ?? 0), 0);
+        return v > 0 ? formatCurrency(v) : 'Not disclosed';
+      }
+      return 'Not disclosed';
+    }
+    // No source selected — show total value for this card status
+    const total = stats?.[card.valueKey] ?? 0;
+    return total > 0 ? formatCurrency(total) : 'Not disclosed';
+  };
+
+  const activeCardDef = STATUS_CARDS.find(c => c.id === activeTab)!;
+
   return (
     <div className={`${styles.page} page-enter`}>
 
@@ -274,7 +313,7 @@ export default function TendersPage() {
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.heading}>Tender Management</h2>
-          <p className={styles.headingSub}>Track and Manage Australian Government Contracts</p>
+          <p className={styles.headingSub}>Track and manage Australian government contracts</p>
         </div>
         <button className={styles.exportBtn} onClick={exportCSV}>
           <Download size={14} />
@@ -282,25 +321,140 @@ export default function TendersPage() {
         </button>
       </div>
 
-      {/* ── Stat cards ── */}
-      <div className={styles.statGrid}>
-        {statCards.map((card, i) => (
-          <motion.div
-            key={card.label}
-            className={styles.statCard}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0  }}
-            transition={{ delay: i * 0.07 }}
-          >
-            <div className={styles.statIcon} style={{ background: card.gradient }}>
-              <card.icon size={16} />
-            </div>
-            <div>
-              <p className={styles.statLabel}>{card.label}</p>
-              <p className={styles.statValue}>{card.value}</p>
-            </div>
-          </motion.div>
-        ))}
+      {/* ── Total Value card (full width) ── */}
+      <motion.div
+        className={styles.totalValueCard}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className={styles.totalValueLeft}>
+          <div className={styles.totalValueIcon}>
+            <DollarSign size={20} />
+          </div>
+          <div>
+            <p className={styles.totalValueLabel}>Total Portfolio Value</p>
+            <p className={styles.totalValueAmount}>
+              {stats ? formatCurrency(stats.total_value) : '…'}
+            </p>
+          </div>
+        </div>
+        <div className={styles.totalValueRight}>
+          <div className={styles.totalValueStat}>
+            <p className={styles.tvStatLabel}>Total Tenders</p>
+            <p className={styles.tvStatValue}>{stats ? formatNumber(stats.total_tenders) : '…'}</p>
+          </div>
+          <div className={styles.totalValueDivider} />
+          <div className={styles.totalValueStat}>
+            <p className={styles.tvStatLabel}>Avg Value</p>
+            <p className={styles.tvStatValue}>{stats ? formatCurrency(stats.avg_value) : '…'}</p>
+          </div>
+          <div className={styles.totalValueDivider} />
+          <div className={styles.totalValueStat}>
+            <p className={styles.tvStatLabel}>Data Sources</p>
+            <p className={styles.tvStatValue}>{stats ? Object.keys(stats.sources).length : '…'}</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ── Status filter cards ── */}
+      <div className={styles.statusGrid}>
+        {STATUS_CARDS.map((card, i) => {
+          const isActive = activeTab === card.id;
+          const count    = stats?.[card.countKey] ?? 0;
+
+          return (
+            <motion.button
+              key={card.id}
+              className={clsx(styles.statusCard, isActive && styles.statusCardActive)}
+              style={{
+                background:  isActive ? card.bg    : 'var(--card-bg)',
+                borderColor: isActive ? card.color : 'var(--card-border)',
+                boxShadow:   isActive
+                  ? `0 0 0 1px ${card.color}55, 0 4px 24px ${card.color}22`
+                  : 'none',
+              }}
+              onClick={() => handleTab(card.id)}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + i * 0.07 }}
+              whileHover={{ y: -2, scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {/* Icon + label */}
+              <div className={styles.scTop}>
+                <div
+                  className={styles.scIconWrap}
+                  style={{
+                    background: isActive ? card.color + '25' : 'var(--bg-elevated)',
+                    border:     `1px solid ${isActive ? card.color + '55' : 'var(--border)'}`,
+                  }}
+                >
+                  <card.icon size={15} style={{ color: isActive ? card.color : 'var(--text-dim)' }} />
+                </div>
+                <span className={styles.scLabel} style={{ color: isActive ? card.color : 'var(--text-secondary)' }}>
+                  {card.label}
+                </span>
+                {isActive && (
+                  <motion.span
+                    className={styles.scActivePill}
+                    style={{
+                      background: card.color + '22',
+                      color:      card.color,
+                      border:     `1px solid ${card.color}44`,
+                    }}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                  >
+                    Selected
+                  </motion.span>
+                )}
+              </div>
+
+              {/* Count */}
+              <p className={styles.scCount} style={{ color: isActive ? card.color : 'var(--text-primary)' }}>
+                {stats ? formatNumber(count) : '…'}
+              </p>
+
+              <p className={styles.scDesc}>{card.desc}</p>
+
+              <div className={styles.scDivider} style={{ background: isActive ? card.color + '33' : 'var(--border)' }} />
+
+              {/* Source filter dropdown */}
+              <div className={styles.scSourceRow} onClick={e => e.stopPropagation()}>
+                <span className={styles.scSourceLabel}>Source:</span>
+                <select
+                  className={styles.scSourceSelect}
+                  value={isActive ? sourceName : ''}
+                  onChange={e => {
+                    handleTab(card.id);
+                    handleSource(e.target.value);
+                  }}
+                  style={{ borderColor: isActive ? card.color + '44' : 'var(--border)' }}
+                >
+                  <option value="">All Sources</option>
+                  {Object.keys(stats?.sources ?? {}).map(s => (
+                    <option key={s} value={s}>{getSourceLabel(s)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Value — updates based on selected source */}
+              <div className={styles.scValueRow}>
+                <span className={styles.scValueLabel}>
+                  {isActive && sourceName ? `${getSourceLabel(sourceName)} value` : 'Total value'}
+                </span>
+                <span
+                  className={styles.scValue}
+                  style={{ color: isActive ? card.color : 'var(--text-secondary)' }}
+                >
+                  {getDisplayValue(card, isActive ? sourceName : '', isActive)}
+                </span>
+              </div>
+
+            </motion.button>
+          );
+        })}
       </div>
 
       {/* ── Filters ── */}
@@ -324,26 +478,30 @@ export default function TendersPage() {
         loading={isListLoading}
       />
 
-      {/* ── Tabs ── */}
-      <div className={styles.tabBar}>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            className={clsx(styles.tab, activeTab === tab.id && styles.tabActive)}
-            onClick={() => handleTab(tab.id)}
+      {/* ── Active tab label ── */}
+      <div className={styles.activeTabLabel}>
+        <activeCardDef.icon size={14} style={{ color: activeCardDef.color }} />
+        <span style={{ color: activeCardDef.color, fontWeight: 600 }}>{activeCardDef.label}</span>
+        {sourceName && (
+          <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+            · {getSourceLabel(sourceName)}
+          </span>
+        )}
+        {total > 0 && (
+          <span
+            className={styles.activeTabCount}
+            style={{
+              background: activeCardDef.color + '22',
+              color:      activeCardDef.color,
+            }}
           >
-            <tab.icon size={14} />
-            {tab.label}
-            {activeTab === tab.id && total > 0 && (
-              <span className={styles.tabCount}>{total}</span>
-            )}
-          </button>
-        ))}
+            {formatNumber(total)} results
+          </span>
+        )}
       </div>
 
       {/* ── Tender list ── */}
       <div className={styles.listWrap}>
-
         {/* Loading skeletons */}
         {isListLoading && (
           <div className={styles.skeletonList}>
@@ -379,9 +537,11 @@ export default function TendersPage() {
             <Inbox size={36} className={styles.emptyIcon} />
             <p className={styles.emptyTitle}>No tenders found</p>
             <p className={styles.emptySub}>
-              {activeTab === 'active' || activeTab === 'upcoming'
-                ? 'No live tenders — your data source contains historical closed contracts'
-                : 'Try adjusting your filters'}
+              {activeTab === 'active'
+                ? 'No active tenders — add more Tenders.Net URLs in Data Sources'
+                : activeTab === 'upcoming'
+                  ? 'No upcoming tenders matching your filters'
+                  : 'Try adjusting your filters'}
             </p>
             {(search || sector || state || year || sourceName) && (
               <button className={styles.clearFiltersBtn} onClick={handleClear}>
@@ -459,7 +619,6 @@ export default function TendersPage() {
         )}
       </div>
 
-      {/* ── Detail modal ── */}
       {selectedTender && (
         <TenderDetailModal
           tender={selectedTender}
