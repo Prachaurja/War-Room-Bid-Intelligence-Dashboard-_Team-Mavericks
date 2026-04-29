@@ -288,7 +288,6 @@ export default function TendersPage() {
     const loadedYears = allYearTenders.map(getTenderYear).filter(Boolean);
     return Array.from(new Set([...baseYears, ...loadedYears])).sort((a, b) => Number(b) - Number(a));
   }, [allYearTenders, yearMode]);
-
   const exportCSV = () => {
     if (!tenders.length) return;
     const headers = ['Title', 'Agency', 'Sector', 'State', 'Value', 'Close Date', 'Status', 'Source'];
