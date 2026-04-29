@@ -15,11 +15,11 @@ The local registry is usually exposed at `localhost:32000`.
 From the repository root:
 
 ```bash
-docker build -f deploy/docker/backend.Dockerfile -t localhost:32000/tendora-backend:dev .
-docker build -f deploy/docker/frontend.Dockerfile -t localhost:32000/tendora-frontend:dev .
+docker build -f deploy/docker/backend.Dockerfile -t localhost:32000/bid-dashboard-backend:dev .
+docker build -f deploy/docker/frontend.Dockerfile -t localhost:32000/bid-dashboard-frontend:dev .
 
-docker push localhost:32000/tendora-backend:dev
-docker push localhost:32000/tendora-frontend:dev
+docker push localhost:32000/bid-dashboard-backend:dev
+docker push localhost:32000/bid-dashboard-frontend:dev
 ```
 
 ## 3. Create secrets
@@ -36,21 +36,21 @@ Do not commit `deploy/k8s/secret.yaml`.
 
 ```bash
 microk8s kubectl apply -k deploy/k8s
-microk8s kubectl -n tendora get pods
+microk8s kubectl -n bid-dashboard get pods
 ```
 
 ## 5. Access locally
 
-Add a hosts entry pointing `tendora.local` to the MicroK8s node IP. For a single local node, this is often `127.0.0.1`.
+Add a hosts entry pointing `bid-dashboard.local` to the MicroK8s node IP. For a single local node, this is often `127.0.0.1`.
 
 ```text
-127.0.0.1 tendora.local
+127.0.0.1 bid-dashboard.local
 ```
 
 Open:
 
 ```text
-http://tendora.local
+http://bid-dashboard.local
 ```
 
 ## Migrations
@@ -58,7 +58,7 @@ http://tendora.local
 Run Alembic after the backend is deployed and database connectivity is configured:
 
 ```bash
-microk8s kubectl -n tendora exec deploy/backend -- alembic upgrade head
+microk8s kubectl -n bid-dashboard exec deploy/backend -- alembic upgrade head
 ```
 
 ## Design Notes

@@ -1,15 +1,15 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: tendora
-  namespace: tendora
+  name: bid-dashboard
+  namespace: bid-dashboard
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   ingressClassName: public
   rules:
-    - host: tendora.local
+    - host: bid-dashboard.local
       http:
         paths:
           - path: /

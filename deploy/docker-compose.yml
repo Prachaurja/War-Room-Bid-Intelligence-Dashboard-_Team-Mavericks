@@ -1,7 +1,7 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: tendora-redis
+    container_name: bid-dashboard-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -17,11 +17,11 @@ services:
     build:
       context: ..
       dockerfile: deploy/docker/backend.Dockerfile
-    container_name: tendora-backend
+    container_name: bid-dashboard-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/tendora}
-      SYNC_DATABASE_URL: ${SYNC_DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:5432/tendora}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/bid_dashboard}
+      SYNC_DATABASE_URL: ${SYNC_DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:5432/bid_dashboard}
       SECRET_KEY: ${SECRET_KEY:-change-me-for-local-development}
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
@@ -41,7 +41,10 @@ services:
     build:
       context: ..
       dockerfile: deploy/docker/frontend.Dockerfile
-    container_name: tendora-frontend
+      args:
+        VITE_API_URL: ""
+        VITE_WS_URL: ""
+    container_name: bid-dashboard-frontend
     restart: unless-stopped
     ports:
       - "5173:80"

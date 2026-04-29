@@ -5,11 +5,11 @@ This project can run as containers for local validation and as Kubernetes worklo
 ## Docker Compose
 
 Default mode reads backend database/auth settings from your shell environment and starts Redis locally.
-For convenience, copy `deploy/backend.env.example` and pass it with `--env-file`:
+For convenience, copy `deploy/.env.example` and pass it with `--env-file`:
 
 ```bash
-cp deploy/backend.env.example deploy/backend.env
-docker compose --env-file deploy/backend.env -f deploy/docker-compose.yml up --build
+cp deploy/.env.example deploy/.env
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build
 ```
 
 Open:
@@ -43,3 +43,4 @@ See `deploy/k8s/README.md`.
 
 - Do not copy real `.env` values into Dockerfiles. They are injected at runtime through compose or Kubernetes secrets.
 - Frontend uses same-origin API/WebSocket URLs by default, which works behind nginx and MicroK8s Ingress.
+- Do not set `VITE_API_URL` or `VITE_WS_URL` for the Docker frontend unless you intentionally want the browser to bypass nginx.

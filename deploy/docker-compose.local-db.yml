@@ -1,10 +1,10 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: tendora-postgres
+    container_name: bid-dashboard-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: tendora
+      POSTGRES_DB: bid_dashboard
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -12,15 +12,15 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d tendora"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bid_dashboard"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   backend:
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/tendora
-      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5432/tendora
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/bid_dashboard
+      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5432/bid_dashboard
       REDIS_URL: redis://redis:6379/0
     depends_on:
       redis:

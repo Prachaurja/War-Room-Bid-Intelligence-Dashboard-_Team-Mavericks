@@ -11,7 +11,7 @@ import { useAuthStore } from '../../store/auth.store';
 import styles from './ReportsPage.module.css';
 import clsx from 'clsx';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 type ReportStatus = 'completed' | 'processing' | 'scheduled';
 

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  namespace: tendora
+  namespace: bid-dashboard
 spec:
   replicas: 1
   selector:
@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: localhost:32000/tendora-frontend:dev
+          image: localhost:32000/bid-dashboard-frontend:dev
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -43,7 +43,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend
-  namespace: tendora
+  namespace: bid-dashboard
 spec:
   selector:
     app: frontend

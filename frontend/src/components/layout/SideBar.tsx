@@ -98,7 +98,7 @@ export default function Sidebar() {
     }
 
     if (systemPanel === 'sources') {
-      const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
       return (
         <div className={styles.systemPanelBody}>
           <div className={styles.sourceRow}>

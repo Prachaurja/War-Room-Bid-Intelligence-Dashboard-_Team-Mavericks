@@ -65,3 +65,4 @@ secret.yaml
 k8s/secret.yaml
 deploy/k8s/secret.yaml
 deploy/backend.env
+deploy/.env

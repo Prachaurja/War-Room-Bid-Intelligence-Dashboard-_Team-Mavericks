@@ -3,7 +3,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm i
 
 COPY frontend/ .
 
@@ -12,6 +12,7 @@ ARG VITE_WS_URL=
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 
+RUN rm -f .env .env.local .env.production .env.production.local
 RUN npm run build
 
 FROM nginx:1.27-alpine
