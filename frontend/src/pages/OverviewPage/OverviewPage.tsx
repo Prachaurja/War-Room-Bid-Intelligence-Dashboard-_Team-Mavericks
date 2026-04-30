@@ -27,6 +27,7 @@ const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
 
 const STORAGE_KEY_COUNT     = 'wr_last_total_tenders';
 const STORAGE_KEY_TIMESTAMP = 'wr_last_visit_ts';
+const BASELINE_TTL_MS       = 30 * 60 * 1000; // 30 minutes
 
 export default function OverviewPage() {
   const { data: stats, isLoading } = useOverviewStats();
@@ -34,6 +35,7 @@ export default function OverviewPage() {
   const { user }                   = useAuth();
   const navigate                   = useNavigate();
 
+  // ── Read the baseline ONCE on mount, before any writes ───
   const [snapshot] = useState(() => {
     const rawCount = localStorage.getItem(STORAGE_KEY_COUNT);
     return {
@@ -42,6 +44,7 @@ export default function OverviewPage() {
     };
   });
 
+  // ── Derive new-tenders count from frozen snapshot ─────────
   const newSinceLastVisit = useMemo<number | null>(() => {
     if (stats?.total_tenders == null || snapshot.prevCount === null) return null;
     const diff = stats.total_tenders - snapshot.prevCount;
@@ -50,11 +53,22 @@ export default function OverviewPage() {
 
   const lastVisitTs = snapshot.prevTs;
 
+  // ── Only update baseline after 30 minutes ─────────────────
+  // This keeps "+N tenders" visible across refreshes within
+  // the 30-minute window instead of resetting on every load.
   useEffect(() => {
     if (stats?.total_tenders == null) return;
-    localStorage.setItem(STORAGE_KEY_COUNT,     String(stats.total_tenders));
-    localStorage.setItem(STORAGE_KEY_TIMESTAMP, new Date().toISOString());
-  }, [stats?.total_tenders]);
+
+    const prevTs  = snapshot.prevTs;
+    const ageMs   = prevTs
+      ? Date.now() - new Date(prevTs).getTime()
+      : Infinity;
+
+    if (ageMs > BASELINE_TTL_MS || !prevTs) {
+      localStorage.setItem(STORAGE_KEY_COUNT,     String(stats.total_tenders));
+      localStorage.setItem(STORAGE_KEY_TIMESTAMP, new Date().toISOString());
+    }
+  }, [stats?.total_tenders, snapshot.prevTs]);
 
   const unreadAlerts = useMemo(
     () => (alertsData ?? []).filter(a => !a.read).length,
@@ -87,7 +101,7 @@ export default function OverviewPage() {
 
   const statCards = [
     {
-      title:    'Total Tenders Value',
+      title:    'Total Tender Value',
       value:    formatCurrency(stats?.total_value),
       sub:      `Avg ${formatCurrency(stats?.avg_value)} per tender`,
       icon:     DollarSign,
@@ -95,7 +109,7 @@ export default function OverviewPage() {
       change:   0,
     },
     {
-      title:    'Total Tenders',
+      title:    'Total Tender Bids',
       value:    formatNumber(stats?.total_tenders),
       sub:      `Across ${Object.keys(stats?.sources ?? {}).length} data sources`,
       icon:     Layers,
@@ -103,7 +117,7 @@ export default function OverviewPage() {
       change:   8.1,
     },
     {
-      title:    'Active Tenders',
+      title:    'Active Bids',
       value:    formatNumber(stats?.active_tenders ?? 0),
       sub:      stats?.upcoming_tenders
         ? `+ ${formatNumber(stats.upcoming_tenders)} upcoming`
@@ -113,7 +127,7 @@ export default function OverviewPage() {
       change:   3.2,
     },
     {
-      title:    'Closed Tenders',
+      title:    'Closed Bids',
       value:    formatNumber(stats?.closed_tenders),
       sub:      'Historical awarded contracts',
       icon:     CheckCircle2,
@@ -175,7 +189,7 @@ export default function OverviewPage() {
               <div className={styles.newTendersCount}>First visit</div>
             ) : newSinceLastVisit === 0 ? (
               <div className={styles.newTendersCount} style={{ color: 'var(--text-muted)' }}>
-                No new tenders
+                No New Tenders
               </div>
             ) : (
               <div className={styles.newTendersCount}>
