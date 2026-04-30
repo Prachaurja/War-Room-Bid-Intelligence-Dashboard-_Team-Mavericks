@@ -18,6 +18,15 @@ import { formatCurrency, formatNumber } from '../../utils/formatters';
 import styles from './TendersPage.module.css';
 import clsx from 'clsx';
 
+/** Calendar year from close or published date — pure helper for stable useMemo deps */
+function tenderCalendarYear(tender: Tender, mode: YearMode): string {
+  const dateValue = mode === 'published' ? tender.published_date : tender.close_date;
+  if (!dateValue) return '';
+
+  const parsed = new Date(dateValue);
+  return Number.isNaN(parsed.getTime()) ? '' : String(parsed.getFullYear());
+}
+
 type Tab = 'active' | 'upcoming' | 'closed';
 type PageItem = number | 'dots-left' | 'dots-right';
 
@@ -195,7 +204,7 @@ export default function TendersPage() {
   const { data: stats }              = useOverviewStats();
   const { data: sourceStats }        = useSourceStats();
 
-  const rawTenders = data?.items ?? [];
+  const rawTenders = useMemo(() => data?.items ?? [], [data?.items]);
   const yearFetchFilters = {
     status: activeTab === 'active' ? 'open' : activeTab,
     sector: sector || undefined,
@@ -237,17 +246,9 @@ export default function TendersPage() {
   const isListLoading = isLoading || isYearLoading;
   const isListError = isError;
 
-  const getTenderYear = (tender: Tender) => {
-    const dateValue = yearMode === 'published' ? tender.published_date : tender.close_date;
-    if (!dateValue) return '';
-
-    const parsed = new Date(dateValue);
-    return Number.isNaN(parsed.getTime()) ? '' : String(parsed.getFullYear());
-  };
-
   const yearFilteredTenders = useMemo(() => {
     if (!year) return needsFullDataset ? allYearTenders : rawTenders;
-    return allYearTenders.filter((tender) => getTenderYear(tender) === year);
+    return allYearTenders.filter((tender) => tenderCalendarYear(tender, yearMode) === year);
   }, [allYearTenders, needsFullDataset, rawTenders, year, yearMode]);
 
   const tenders = needsFullDataset
@@ -285,7 +286,7 @@ export default function TendersPage() {
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const baseYears = Array.from({ length: 10 }, (_, index) => String(currentYear - index));
-    const loadedYears = allYearTenders.map(getTenderYear).filter(Boolean);
+    const loadedYears = allYearTenders.map((tender) => tenderCalendarYear(tender, yearMode)).filter(Boolean);
     return Array.from(new Set([...baseYears, ...loadedYears])).sort((a, b) => Number(b) - Number(a));
   }, [allYearTenders, yearMode]);
   const exportCSV = () => {
@@ -337,7 +338,7 @@ export default function TendersPage() {
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.heading}>Tender Management</h2>
-          <p className={styles.headingSub}>Track and manage Australian government contracts</p>
+          <p className={styles.headingSub}>Track and Manage Australian Government Tender Bids</p>
         </div>
         <button className={styles.exportBtn} onClick={exportCSV}>
           <Download size={14} />
@@ -357,7 +358,7 @@ export default function TendersPage() {
             <DollarSign size={20} />
           </div>
           <div>
-            <p className={styles.totalValueLabel}>Total Portfolio Value</p>
+            <p className={styles.totalValueLabel}>Total Tender Value</p>
             <p className={styles.totalValueAmount}>
               {stats ? formatCurrency(stats.total_value) : '…'}
             </p>
