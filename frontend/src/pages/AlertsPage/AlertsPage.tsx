@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
+import { isAxiosError } from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -47,6 +48,18 @@ const SECTOR_LABELS: Record<string, string> = {
   facility_management: 'Facility Mgmt', it_services: 'IT Services',
   healthcare: 'Healthcare', transportation: 'Transportation',
   other: 'Other', '': 'All Sectors',
+};
+
+const bold = (content: React.ReactNode) => <strong>{content}</strong>;
+const stateText = (text: string) => <strong className="appToastStateText">{text}</strong>;
+
+const getToastErrorMessage = (error: unknown) => {
+  if (!isAxiosError(error)) return 'Unexpected error';
+
+  const detail = error.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (error.response?.status) return `Request failed (${error.response.status})`;
+  return error.message || 'Network request failed';
 };
 
 // ── Pagination component ──────────────────────────────────────
@@ -280,19 +293,46 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
   });
   const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
   const createSavedSearch = useCreateSavedSearch();
+  const deleteSavedSearch = useDeleteSavedSearch();
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
-    await createSavedSearch.mutateAsync({
-      name:          form.name,
-      sector:        form.sector || undefined,
-      state:         form.state  || undefined,
-      min_value:     Number(form.minValue) || 0,
-      max_value:     Number(form.maxValue) || 0,
-      notifications: form.notifications,
-    });
-    toast.success('Alert has been created');
-    onClose();
+    const searchName = form.name.trim();
+    const toastId = toast.loading(
+      <span>{bold('Creating')} [{searchName}] ...
+      </span>
+    );
+
+    try {
+      const created = await createSavedSearch.mutateAsync({
+        name:          searchName,
+        sector:        form.sector || undefined,
+        state:         form.state  || undefined,
+        min_value:     Number(form.minValue) || 0,
+        max_value:     Number(form.maxValue) || 0,
+        notifications: form.notifications,
+      }) as SavedSearchItem;
+
+      toast.dismiss(toastId);
+      toast.success(<span> {bold(`[${searchName}]`)} has been {stateText('Created')}</span>, 
+      {
+        className: 'appToastToggleOn',
+        action: created?.id
+          ? {
+              label: 'Undo',
+              onClick: () => deleteSavedSearch.mutate(created.id),
+            }
+          : undefined,
+      });
+      onClose();
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error('Alert search could not be created', 
+        {
+        className: 'appToastToggleOn',
+        description: "(" + getToastErrorMessage(error) + ")",
+      });
+    }
   };
 
   const modal = (
@@ -412,11 +452,35 @@ export default function AlertsPage() {
   );
 
   const updateNotifPref = (key: 'email' | 'sms' | 'push') => {
+    const labels = {
+      email: 'Email Alerts',
+      sms:   'SMS Alerts',
+      push:  'Push Notifications',
+    };
+    const previousValue = notifPrefs[key];
+
     setNotifPrefs(prev => {
       const next = { ...prev, [key]: !prev[key] };
       savePref('war_room_notif_prefs', next);
       return next;
     });
+
+    toast(
+      <span>{bold(labels[key])} has been {stateText(previousValue ? 'Disabled' : 'Enabled')}</span>,
+      {
+      className: previousValue ? 'appToastToggleOff' : 'appToastToggleOn',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setNotifPrefs(prev => {
+            const next = { ...prev, [key]: previousValue };
+            savePref('war_room_notif_prefs', next);
+            return next;
+          });
+        },
+      },
+      },
+    );
   };
 
   // ── Real data hooks ───────────────────────────────────────
@@ -427,6 +491,53 @@ export default function AlertsPage() {
   const deleteAlert       = useDeleteAlert();
   const deleteSavedSearch = useDeleteSavedSearch();
   const toggleSavedSearch = useToggleSavedSearch();
+
+  const handleToggleSavedSearch = async (searchItem: SavedSearchItem) => {
+    const nextEnabled = !searchItem.notifications;
+    const toastId = toast.loading(
+      <span>{stateText(nextEnabled ? 'Enabling' : 'Muting')} {bold(`[${searchItem.name}]`)}</span>,
+      {className: nextEnabled ? 'appToastToggleOn' : 'appToastToggleOff',}
+    );
+    try {
+      await toggleSavedSearch.mutateAsync(searchItem.id);
+
+      toast.dismiss(toastId);
+      toast.success(<span>{bold(`[${searchItem.name}]`)} has been {stateText(nextEnabled ? 'Enabled' : 'Muted')}</span>, {
+        className: nextEnabled ? 'appToastToggleOn' : 'appToastToggleOff',
+        action: {
+          label: 'Undo',
+          onClick: () => toggleSavedSearch.mutate(searchItem.id),
+        },
+      });
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error(<span>{stateText(`[${searchItem.name}]`)} could not be updated</span>, {
+         className: 'appToastToggleOff',
+         description: "(" + getToastErrorMessage(error) + ")",
+      });
+    }
+  };
+
+  const handleDeleteSavedSearch = async (searchItem: SavedSearchItem) => {
+    const toastId = toast.loading(<span>{stateText("Deleting")} {bold(`[${searchItem.name}]`)}...</span>,
+    {className: 'appToastToggleOff'}
+    );
+
+    try {
+      await deleteSavedSearch.mutateAsync(searchItem.id);
+
+      toast.dismiss(toastId);
+      toast.success(<span>{bold(`[${searchItem.name}]`)} has been {stateText('Deleted')}
+      </span>,
+      {className: 'appToastToggleOn'}
+      );
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error(<span>{bold(`[${searchItem.name}]`)} could not be deleted</span>, {
+         description: "(" + getToastErrorMessage(error) + ")",
+      });
+    }
+  };
 
   const alerts   = useMemo(() => alertsData   ?? [], [alertsData]);
   const searches = useMemo(() => searchesData ?? [], [searchesData]);
@@ -723,14 +834,14 @@ export default function AlertsPage() {
                         <div className={styles.ssActions}>
                           <button
                             className={clsx(styles.ssToggle, s.notifications && styles.ssToggleOn)}
-                            onClick={() => toggleSavedSearch.mutate(s.id)}
+                            onClick={() => void handleToggleSavedSearch(s)}
                             title={s.notifications ? 'Disable notifications' : 'Enable notifications'}
                           >
                             <span className={styles.ssToggleThumb} />
                           </button>
                           <button
                             className={styles.ssDeleteBtn}
-                            onClick={() => deleteSavedSearch.mutate(s.id)}
+                            onClick={() => void handleDeleteSavedSearch(s)}
                             title="Delete search"
                           >
                             <X size={11} />
@@ -824,7 +935,9 @@ export default function AlertsPage() {
       </div>
 
       {/* Modal — portal to document.body so position:fixed anchors to viewport */}
-      {showModal && <CreateAlertModal onClose={() => setShowModal(false)} />}
+      <AnimatePresence>
+        {showModal && <CreateAlertModal onClose={() => setShowModal(false)} />}
+      </AnimatePresence>
 
     </div>
   );
