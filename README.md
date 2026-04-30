@@ -55,7 +55,13 @@ graph TD
 
 ### Run Locally
 
-Create `backend/.env` before starting the backend. The backend reads this file through Pydantic settings, and it is required for database and JWT configuration.
+```
+git clone https://github.com/Prachaurja/War-Room-Bid-Intelligence-Dashboard-_Team-Mavericks
+cd War-Room-Bid-Intelligence-Dashboard-_Team-Mavericks
+git switch feat/deploy
+```
+
+Create `.env` in /backend before starting the backend. The backend reads this file through Pydantic settings, and it is required for database and JWT configuration.
 
 ```env
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/bid_dashboard
@@ -94,26 +100,62 @@ VITE_WS_URL=ws://localhost:8000/ws/live
 
 ### Run with Docker Compose
 
+Prerequisites:
+
+- Git
+- Docker Desktop or Docker Engine with Docker Compose
+- A PostgreSQL database, unless you use the local database override shown below
+
+Clone the project and enter the repository folder:
+
 ```bash
-# optional: copy backend environment defaults
+git clone https://github.com/Prachaurja/War-Room-Bid-Intelligence-Dashboard-_Team-Mavericks
+cd War-Room-Bid-Intelligence-Dashboard-_Team-Mavericks
+git switch feat/deploy
+```
+
+Create the Docker Compose environment file:
+
+```bash
 cp deploy/.env.example deploy/.env
+```
 
-# start frontend, backend, and redis
+Edit `deploy/.env` before starting the containers. At minimum, replace `SECRET_KEY` and make sure both database URLs point to your PostgreSQL database:
+
+```env
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/bid_dashboard
+SYNC_DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/bid_dashboard
+SECRET_KEY=replace-me-with-a-long-random-secret
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+```
+
+Start the containers from the repository root:
+
+```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build
+```
 
-# view logs
-docker compose -f deploy/docker-compose.yml logs -f
+In another terminal, run database migrations:
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml exec backend alembic upgrade head
 ```
 
 Frontend: `http://localhost:5173`
 Backend health: `http://localhost:8000/health`
 
-By default, Docker Compose expects PostgreSQL to be reachable from the host using the connection strings in `deploy/.env`.
-For a fully local PostgreSQL container, use the optional local-db override:
+View logs:
 
 ```bash
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local-db.yml up --build
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local-db.yml exec backend alembic upgrade head
+docker compose -f deploy/docker-compose.yml logs -f
+```
+
+If you do not already have PostgreSQL running, use the optional local database override instead:
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.local-db.yml up --build
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.local-db.yml exec backend alembic upgrade head
 ```
 
 Frontend container builds use same-origin API and WebSocket URLs by default, so browser requests go through the nginx proxy instead of directly calling `localhost:8000`.

@@ -4,11 +4,40 @@ This project can run as containers for local validation and as Kubernetes worklo
 
 ## Docker Compose
 
-Default mode reads backend database/auth settings from your shell environment and starts Redis locally.
-For convenience, copy `deploy/.env.example` and pass it with `--env-file`:
+These commands must be run from the repository root, not from inside the `deploy` folder.
+
+Prerequisites:
+
+- Git
+- Docker Desktop or Docker Engine with Docker Compose
+- PostgreSQL, unless you use the local database override below
+
+Clone the project and enter the repository:
+
+```bash
+git clone <repository-url>
+cd War-Room-Bid-Intelligence-Dashboard-_Team-Mavericks
+```
+
+Create an environment file for Docker Compose:
 
 ```bash
 cp deploy/.env.example deploy/.env
+```
+
+Edit `deploy/.env` before starting the containers. Replace `SECRET_KEY` and set the database connection strings for your environment:
+
+```env
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/bid_dashboard
+SYNC_DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/bid_dashboard
+SECRET_KEY=replace-me-with-a-long-random-secret
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+```
+
+Start frontend, backend, and Redis:
+
+```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build
 ```
 
@@ -17,11 +46,17 @@ Open:
 - Frontend: `http://localhost:5173`
 - Backend health: `http://localhost:8000/health`
 
+Run migrations after the backend is running:
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml exec backend alembic upgrade head
+```
+
 Optional local Postgres:
 
 ```bash
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local-db.yml up --build
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local-db.yml exec backend alembic upgrade head
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.local-db.yml up --build
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.local-db.yml exec backend alembic upgrade head
 ```
 
 Useful commands:
