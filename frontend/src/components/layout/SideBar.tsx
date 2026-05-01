@@ -3,33 +3,32 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import {
   LayoutDashboard, Gavel, BarChart3, FileText,
-  Users, Bell, Shield, LogOut, Settings, ChevronRight,
-  Target, Wifi, X, RefreshCw, Database, LockKeyhole, Paintbrush,
+  Bell, LogOut, Settings, ChevronRight,
+  Target, Wifi, X, RefreshCw, Database,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { useUIStore } from '../../store/ui.store';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useAlerts } from '../../hooks/useAlerts';
+import { useOverviewStats } from '../../hooks/useTenders';
+import { getSourceDescription, getSourceLabel } from '../../utils/sourceLabels';
 import clsx from 'clsx';
 import styles from './SideBar.module.css';
 
-type SystemPanelKey = 'security' | 'sources' | 'settings' | null;
+type SystemPanelKey = 'sources' | null;
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const {
     sidebarOpen,
-    themeMode,
-    resolvedTheme,
-    setThemeMode,
-    setSidebarOpen,
   } = useUIStore();
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { status, newTenders, newAlerts, clearCounters } = useWebSocket();
   const { data: alertsData } = useAlerts();
+  const { data: stats } = useOverviewStats();
   const [systemPanel, setSystemPanel] = useState<SystemPanelKey>(null);
 
   const unreadCount = (alertsData ?? []).filter((a) => !a.read).length;
@@ -44,7 +43,6 @@ export default function Sidebar() {
     { label: 'Tenders', path: '/tenders', icon: Gavel, badge: null },
     { label: 'Analytics', path: '/analytics', icon: BarChart3, badge: null },
     { label: 'Reports', path: '/reports', icon: FileText, badge: null },
-    { label: 'Customers', path: '/customers', icon: Users, badge: null },
     { label: 'Alerts', path: '/alerts', icon: Bell, badge: totalBadge > 0 ? String(totalBadge) : null },
   ];
 
@@ -56,9 +54,7 @@ export default function Sidebar() {
     .slice(0, 2) ?? 'WR';
 
   const systemButtons = [
-    { key: 'security', label: 'Security', icon: Shield },
     { key: 'sources', label: 'Data Sources', icon: Database },
-    { key: 'settings', label: 'Settings', icon: Settings },
   ] as const;
 
   const closeSystemPanel = () => setSystemPanel(null);
@@ -66,41 +62,23 @@ export default function Sidebar() {
   const renderSystemPanel = () => {
     if (!systemPanel) return null;
 
-    if (systemPanel === 'security') {
-      return (
-        <div className={styles.systemPanelBody}>
-          <div className={styles.systemStatGrid}>
-            <div className={styles.systemStat}>
-              <span className={styles.systemStatLabel}>Account</span>
-              <strong className={styles.systemStatValue}>{user?.name ?? 'Analyst'}</strong>
-            </div>
-            <div className={styles.systemStat}>
-              <span className={styles.systemStatLabel}>Role</span>
-              <strong className={styles.systemStatValue}>{user?.role ?? 'admin'}</strong>
-            </div>
-            <div className={styles.systemStat}>
-              <span className={styles.systemStatLabel}>Session</span>
-              <strong className={styles.systemStatValue}>Authenticated</strong>
-            </div>
-            <div className={styles.systemStat}>
-              <span className={styles.systemStatLabel}>Token Cache</span>
-              <strong className={styles.systemStatValue}>
-                {localStorage.getItem('wr_token') ? 'Stored locally' : 'Unavailable'}
-              </strong>
-            </div>
-          </div>
-          <button className={styles.systemPrimaryBtn} onClick={() => void logout()}>
-            <LockKeyhole size={14} />
-            Sign out
-          </button>
-        </div>
-      );
-    }
-
     if (systemPanel === 'sources') {
       const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+      const sourceEntries = Object.entries(stats?.sources ?? {})
+        .filter(([, count]) => count > 0)
+        .sort((a, b) => b[1] - a[1]);
+
       return (
         <div className={styles.systemPanelBody}>
+          {sourceEntries.map(([sourceName, count]) => (
+            <div key={sourceName} className={styles.sourceCard}>
+              <div>
+                <p className={styles.sourceCardTitle}>{getSourceLabel(sourceName)}</p>
+                <p className={styles.sourceCardSub}>{getSourceDescription(sourceName)}</p>
+              </div>
+              <span className={styles.sourceCardCount}>{count}</span>
+            </div>
+          ))}
           <div className={styles.sourceRow}>
             <span className={styles.sourceLabel}>API Endpoint</span>
             <span className={styles.sourceValue}>{apiUrl}</span>
@@ -128,62 +106,11 @@ export default function Sidebar() {
               <RefreshCw size={13} />
               Refresh
             </button>
-            <button
-              className={styles.systemGhostBtn}
-              onClick={() => {
-                closeSystemPanel();
-                navigate('/alerts');
-              }}
-            >
-              <Bell size={13} />
-              Open Alerts
-            </button>
           </div>
         </div>
       );
     }
-
-    return (
-      <div className={styles.systemPanelBody}>
-        <div className={styles.themeChoiceGroup}>
-          {(['system', 'dark', 'light'] as const).map((mode) => (
-            <button
-              key={mode}
-              className={clsx(styles.themeChoice, themeMode === mode && styles.themeChoiceActive)}
-              onClick={() => setThemeMode(mode)}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-        <div className={styles.sourceRow}>
-          <span className={styles.sourceLabel}>Resolved Theme</span>
-          <span className={styles.sourceValue}>{resolvedTheme}</span>
-        </div>
-        <div className={styles.systemActionRow}>
-          <button
-            className={styles.systemGhostBtn}
-            onClick={() => {
-              closeSystemPanel();
-              setSidebarOpen(false);
-            }}
-          >
-            <Paintbrush size={13} />
-            Collapse Sidebar
-          </button>
-          <button
-            className={styles.systemGhostBtn}
-            onClick={() => {
-              closeSystemPanel();
-              navigate('/');
-            }}
-          >
-            <LayoutDashboard size={13} />
-            Dashboard
-          </button>
-        </div>
-      </div>
-    );
+    return null;
   };
 
   return (
@@ -311,6 +238,16 @@ export default function Sidebar() {
                 <span>{button.label}</span>
               </button>
             ))}
+            <button
+              className={clsx(styles.systemItem, location.pathname === '/settings' && styles.systemItemActive)}
+              onClick={() => {
+                closeSystemPanel();
+                navigate('/settings');
+              }}
+            >
+              <Settings size={15} />
+              <span>Settings</span>
+            </button>
           </div>
 
           <AnimatePresence>
@@ -324,14 +261,10 @@ export default function Sidebar() {
                 <div className={styles.systemPanelHeader}>
                   <div>
                     <p className={styles.systemPanelTitle}>
-                      {systemPanel === 'security' ? 'Security' : systemPanel === 'sources' ? 'Data Sources' : 'Settings'}
+                      Data Sources
                     </p>
                     <p className={styles.systemPanelSub}>
-                      {systemPanel === 'security'
-                        ? 'Local account and session actions'
-                        : systemPanel === 'sources'
-                          ? 'Frontend connectivity and feed status'
-                          : 'Appearance and workspace preferences'}
+                      Active feeds, source coverage, and connectivity status
                     </p>
                   </div>
                   <button className={styles.systemPanelClose} onClick={closeSystemPanel}>
