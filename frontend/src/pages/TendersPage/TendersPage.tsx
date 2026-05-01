@@ -193,7 +193,7 @@ export default function TendersPage() {
   const filters = {
     page:       needsFullDataset ? 1 : page,
     page_size:  needsFullDataset ? 100 : pageSizeNumber,
-    status:     activeTab === 'active' ? 'open' : activeTab,
+    status:     activeTab === 'active' ? 'active' : activeTab,
     sector:     sector    || undefined,
     state:      state     || undefined,
     source_name: sourceName || undefined,
@@ -206,7 +206,7 @@ export default function TendersPage() {
 
   const rawTenders = useMemo(() => data?.items ?? [], [data?.items]);
   const yearFetchFilters = {
-    status: activeTab === 'active' ? 'open' : activeTab,
+    status: activeTab === 'active' ? 'active' : activeTab,
     sector: sector || undefined,
     state: state || undefined,
     source_name: sourceName || undefined,

@@ -76,7 +76,7 @@ export interface StateStat {
   total_value: number;
 }
 
-/** Per-status count/value for one source (keys are status strings, e.g. open, closed). */
+/** Per-status count/value for one source. Legacy data may still include open as active. */
 export interface SourceStatusBreakdown {
   count: number;
   value: number;
