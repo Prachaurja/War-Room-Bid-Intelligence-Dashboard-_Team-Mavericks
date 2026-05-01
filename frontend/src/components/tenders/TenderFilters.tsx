@@ -1,4 +1,5 @@
-import { Search, X, SlidersHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import styles from './TenderFilters.module.css';
 
 export type PageSize = '15' | '25' | '50' | '100';
@@ -100,18 +101,47 @@ export default function TenderFilters({
 }: TenderFiltersProps) {
   const activeFilters = [search, sector, state, year, sourceName].filter(Boolean);
   const hasFilters = activeFilters.length > 0;
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   return (
     <div className={styles.wrap}>
       <div className={styles.topRow}>
-        <div className={styles.leftGroup}>
-          <SlidersHorizontal size={14} className={styles.filterIcon} />
-          <span className={styles.filterLabel}>Filters</span>
-          {hasFilters && (
-            <span className={styles.activeCount}>
-              {activeFilters.length} active
-            </span>
-          )}
+        <div className={styles.primaryControls}>
+          <div className={styles.searchWrap}>
+            <Search size={14} className={styles.searchIcon} />
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search title or agency..."
+              value={search}
+              onChange={(event) => onSearch(event.target.value)}
+            />
+            {search && (
+              <button className={styles.clearInput} onClick={() => onSearch('')}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          <button
+            className={styles.filterMenuBtn}
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+          >
+            <SlidersHorizontal size={14} />
+            <span>Filters</span>
+            {hasFilters && <span className={styles.activeCount}>{activeFilters.length}</span>}
+            <ChevronDown size={14} className={filtersOpen ? styles.chevronOpen : ''} />
+          </button>
+          <select
+            className={styles.pageSizeSelect}
+            value={pageSize}
+            onChange={(event) => onPageSize(event.target.value as PageSize)}
+            aria-label="Items per page"
+          >
+            {PAGE_SIZES.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
         </div>
         <div className={styles.rightGroup}>
           {loading ? (
@@ -127,84 +157,63 @@ export default function TenderFilters({
         </div>
       </div>
 
-      <div className={styles.controls}>
-        <div className={styles.searchWrap}>
-          <Search size={14} className={styles.searchIcon} />
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Search title or agency..."
-            value={search}
-            onChange={(event) => onSearch(event.target.value)}
-          />
-          {search && (
-            <button className={styles.clearInput} onClick={() => onSearch('')}>
-              <X size={12} />
-            </button>
-          )}
+      {filtersOpen && (
+        <div className={styles.menuPanel}>
+          <div className={styles.controls}>
+            <select
+              className={styles.select}
+              value={sector}
+              onChange={(event) => onSector(event.target.value)}
+            >
+              {SECTORS.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+
+            <select
+              className={styles.select}
+              value={state}
+              onChange={(event) => onState(event.target.value)}
+            >
+              {STATES.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+
+            <select
+              className={styles.select}
+              value={yearMode}
+              onChange={(event) => onYearMode(event.target.value as YearMode)}
+            >
+              <option value="close">Close Year</option>
+              <option value="published">Published Year</option>
+            </select>
+
+            <select
+              className={styles.select}
+              value={year}
+              onChange={(event) => onYear(event.target.value)}
+            >
+              <option value="">All Years</option>
+              {yearOptions.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+
+            <select
+              className={styles.select}
+              value={sourceName}
+              onChange={(event) => onSource(event.target.value)}
+            >
+              <option value="">All Sources</option>
+              {sourceOptions.map((item) => (
+                <option key={item} value={item}>{sourceLabel(item)}</option>
+              ))}
+            </select>
+
+          </div>
         </div>
-
-        <select
-          className={styles.select}
-          value={sector}
-          onChange={(event) => onSector(event.target.value)}
-        >
-          {SECTORS.map((item) => (
-            <option key={item.value} value={item.value}>{item.label}</option>
-          ))}
-        </select>
-
-        <select
-          className={styles.select}
-          value={state}
-          onChange={(event) => onState(event.target.value)}
-        >
-          {STATES.map((item) => (
-            <option key={item.value} value={item.value}>{item.label}</option>
-          ))}
-        </select>
-
-        <select
-          className={styles.select}
-          value={yearMode}
-          onChange={(event) => onYearMode(event.target.value as YearMode)}
-        >
-          <option value="close">Close Year</option>
-          <option value="published">Published Year</option>
-        </select>
-
-        <select
-          className={styles.select}
-          value={year}
-          onChange={(event) => onYear(event.target.value)}
-        >
-          <option value="">All Years</option>
-          {yearOptions.map((item) => (
-            <option key={item} value={item}>{item}</option>
-          ))}
-        </select>
-
-        <select
-          className={styles.select}
-          value={sourceName}
-          onChange={(event) => onSource(event.target.value)}
-        >
-          <option value="">All Sources</option>
-          {sourceOptions.map((item) => (
-            <option key={item} value={item}>{sourceLabel(item)}</option>
-          ))}
-        </select>
-
-        <select
-          className={styles.select}
-          value={pageSize}
-          onChange={(event) => onPageSize(event.target.value as PageSize)}
-        >
-          {PAGE_SIZES.map((item) => (
-            <option key={item.value} value={item.value}>{item.label}</option>
-          ))}
-        </select>
-      </div>
+      )}
     </div>
   );
 }
