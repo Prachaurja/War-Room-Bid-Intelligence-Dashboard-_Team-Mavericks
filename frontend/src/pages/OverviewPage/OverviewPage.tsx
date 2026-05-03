@@ -1,10 +1,7 @@
-import { useMemo, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import {
   DollarSign, Layers, CheckCircle2,
-  TrendingUp, Bell, ArrowRight, Zap,
-  Sparkles, Radio, Activity,
+  TrendingUp, Activity,
 } from 'lucide-react';
 import StatCard from '../../components/overview/StatCard';
 import BidsBySectorChart from '../../components/overview/BidsBySectorChart';
@@ -12,92 +9,11 @@ import RegionalBidChart from '../../components/overview/RegionalBidChart';
 import RecentActivityFeed from '../../components/overview/RecentActivityFeed';
 import SourceBreakdown from '../../components/overview/SourceBreakdown';
 import { useOverviewStats } from '../../hooks/useTenders';
-import { useAlerts } from '../../hooks/useAlerts';
-import { useAuth } from '../../hooks/useAuth';
-import { formatCurrency, formatNumber, formatAgo } from '../../utils/formatters';
+import { formatCurrency, formatNumber } from '../../utils/formatters';
 import styles from './OverviewPage.module.css';
-
-const SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
-  austender:   { label: 'AusTender',   color: '#7C3AED' },
-  tendersnet:  { label: 'Tenders.Net', color: '#10B981' },
-  qld_tenders: { label: 'QLD Tenders', color: '#F59E0B' },
-  nsw_etender: { label: 'NSW eTender', color: '#3B82F6' },
-  manual:      { label: 'Manual',      color: '#EC4899' },
-};
-
-const STORAGE_KEY_COUNT     = 'wr_last_total_tenders';
-const STORAGE_KEY_TIMESTAMP = 'wr_last_visit_ts';
-const BASELINE_TTL_MS       = 30 * 60 * 1000; // 30 minutes
 
 export default function OverviewPage() {
   const { data: stats, isLoading } = useOverviewStats();
-  const { data: alertsData }       = useAlerts();
-  const { user }                   = useAuth();
-  const navigate                   = useNavigate();
-
-  // ── Read the baseline ONCE on mount, before any writes ───
-  const [snapshot] = useState(() => {
-    const rawCount = localStorage.getItem(STORAGE_KEY_COUNT);
-    return {
-      prevCount: rawCount !== null ? Number(rawCount) : null,
-      prevTs:    localStorage.getItem(STORAGE_KEY_TIMESTAMP),
-    };
-  });
-
-  // ── Derive new-tenders count from frozen snapshot ─────────
-  const newSinceLastVisit = useMemo<number | null>(() => {
-    if (stats?.total_tenders == null || snapshot.prevCount === null) return null;
-    const diff = stats.total_tenders - snapshot.prevCount;
-    return diff > 0 ? diff : 0;
-  }, [stats?.total_tenders, snapshot.prevCount]);
-
-  const lastVisitTs = snapshot.prevTs;
-
-  // ── Only update baseline after 30 minutes ─────────────────
-  // This keeps "+N tenders" visible across refreshes within
-  // the 30-minute window instead of resetting on every load.
-  useEffect(() => {
-    if (stats?.total_tenders == null) return;
-
-    const prevTs  = snapshot.prevTs;
-    const ageMs   = prevTs
-      ? Date.now() - new Date(prevTs).getTime()
-      : Infinity;
-
-    if (ageMs > BASELINE_TTL_MS || !prevTs) {
-      localStorage.setItem(STORAGE_KEY_COUNT,     String(stats.total_tenders));
-      localStorage.setItem(STORAGE_KEY_TIMESTAMP, new Date().toISOString());
-    }
-  }, [stats?.total_tenders, snapshot.prevTs]);
-
-  const unreadAlerts = useMemo(
-    () => (alertsData ?? []).filter(a => !a.read).length,
-    [alertsData],
-  );
-
-  const firstName = useMemo(() => {
-    const name = user?.name ?? '';
-    return name.split(' ')[0] || 'Analyst';
-  }, [user]);
-
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  }, []);
-
-  const today = useMemo(() =>
-    new Date().toLocaleDateString('en-AU', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    }),
-    [],
-  );
-
-  const sources = useMemo(
-    () => Object.entries(stats?.sources ?? {}),
-    [stats?.sources],
-  );
 
   const statCards = [
     {
@@ -138,106 +54,6 @@ export default function OverviewPage() {
 
   return (
     <div className={`${styles.page} page-enter`}>
-
-      {/* ── Welcome strip ── */}
-      <motion.div
-        className={styles.welcomeStrip}
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-      >
-        <div className={styles.welcomeLeft}>
-          <div className={styles.welcomeTextBlock}>
-            <h1 className={styles.welcomeHeading}>
-              {greeting}, <span className={styles.welcomeName}>{firstName}!</span>
-            </h1>
-            <p className={styles.welcomeSub}>{today}</p>
-          </div>
-          <div className={styles.welcomeBadges}>
-            {unreadAlerts > 0 && (
-              <motion.button
-                className={styles.alertBadge}
-                onClick={() => navigate('/alerts')}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                <Bell size={11} />
-                {unreadAlerts} unread alert{unreadAlerts !== 1 ? 's' : ''}
-                <ArrowRight size={11} />
-              </motion.button>
-            )}
-            {stats?.active_tenders != null && (
-              <div className={styles.activeBadge}>
-                <Zap size={11} />
-                {formatNumber(stats.active_tenders)} Active Tenders
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.stripDivider} />
-
-        <div className={styles.welcomeRight}>
-          <div className={styles.newTendersBlock}>
-            <div className={styles.newTendersHeader}>
-              <Sparkles size={12} className={styles.newTendersIcon} />
-              <span className={styles.newTendersLabel}>New since last visit</span>
-            </div>
-            {isLoading ? (
-              <div className={styles.newTendersCount} style={{ color: 'var(--text-dim)' }}>…</div>
-            ) : newSinceLastVisit === null ? (
-              <div className={styles.newTendersCount}>First visit</div>
-            ) : newSinceLastVisit === 0 ? (
-              <div className={styles.newTendersCount} style={{ color: 'var(--text-muted)' }}>
-                No New Tenders
-              </div>
-            ) : (
-              <div className={styles.newTendersCount}>
-                +{formatNumber(newSinceLastVisit)} tenders
-              </div>
-            )}
-            {lastVisitTs && (
-              <p className={styles.newTendersSub}>Last visit {formatAgo(lastVisitTs)}</p>
-            )}
-          </div>
-
-          <div className={styles.rightInnerDivider} />
-
-          <div className={styles.ingestionBlock}>
-            <div className={styles.ingestionHeader}>
-              <Radio size={12} className={styles.ingestionIcon} />
-              <span className={styles.ingestionLabel}>Ingestion Status</span>
-            </div>
-            <div className={styles.sourceRows}>
-              {isLoading ? (
-                [1, 2, 3].map(i => (
-                  <div key={i} className={styles.sourceStatusRow}>
-                    <div className={styles.shimmer} style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0 }} />
-                    <div className={styles.shimmer} style={{ flex: 1, height: 10 }} />
-                    <div className={styles.shimmer} style={{ width: 36, height: 10 }} />
-                  </div>
-                ))
-              ) : sources.length === 0 ? (
-                <p className={styles.noSources}>No sources connected</p>
-              ) : (
-                sources.map(([name, count]) => {
-                  const cfg   = SOURCE_CONFIG[name] ?? { label: name.replace(/_/g, ' '), color: '#6B7280' };
-                  const total = sources.reduce((s, [, v]) => s + v, 0);
-                  const pct   = total > 0 ? Math.round((count / total) * 100) : 0;
-                  return (
-                    <div key={name} className={styles.sourceStatusRow}>
-                      <span className={styles.sourceStatusDot} style={{ background: cfg.color, boxShadow: `0 0 5px ${cfg.color}` }} />
-                      <span className={styles.sourceStatusLabel}>{cfg.label}</span>
-                      <span className={styles.sourceStatusCount}>{formatNumber(count)}</span>
-                      <span className={styles.sourceStatusPct} style={{ color: cfg.color }}>{pct}%</span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      </motion.div>
 
       {/* ── Stat cards ── */}
       <div className={styles.statGrid}>
