@@ -23,8 +23,8 @@ export default function Sidebar() {
   const {
     sidebarOpen,
   } = useUIStore();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location    = useLocation();
+  const navigate    = useNavigate();
   const queryClient = useQueryClient();
   const { status, newTenders, newAlerts, clearCounters } = useWebSocket();
   const { data: alertsData } = useAlerts();
@@ -32,11 +32,11 @@ export default function Sidebar() {
   const [systemPanel, setSystemPanel] = useState<SystemPanelKey>(null);
 
   const unreadCount = (alertsData ?? []).filter((a) => !a.read).length;
-  const totalBadge = unreadCount + newAlerts;
+  const totalBadge  = unreadCount + newAlerts;
 
-  const isConnected = status === 'connected';
+  const isConnected  = status === 'connected';
   const isConnecting = status === 'connecting';
-  const hasNewData = newTenders > 0;
+  const hasNewData   = newTenders > 0;
 
   const NAV_ITEMS = [
     { label: 'Home', path: '/home', icon: Home, badge: null },
@@ -120,8 +120,8 @@ export default function Sidebar() {
         <motion.aside
           key="sidebar"
           initial={{ x: -240, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: -240, opacity: 0 }}
+          animate={{ x: 0,    opacity: 1 }}
+          exit={{    x: -240, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className={styles.sidebar}
         >
@@ -137,23 +137,23 @@ export default function Sidebar() {
             <div
               className={styles.liveIndicator}
               title={
-                isConnected ? 'Live feed connected'
-                  : isConnecting ? 'Connecting...'
-                    : 'Disconnected - reconnecting'
+                isConnected  ? 'Live feed connected'
+                : isConnecting ? 'Connecting...'
+                : 'Disconnected - reconnecting'
               }
             >
               <motion.span
                 className={styles.liveDot}
                 animate={
-                  hasNewData ? { scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }
-                    : isConnected ? { opacity: 1 }
-                      : isConnecting ? { opacity: [1, 0.3, 1] }
-                        : { opacity: 0.3 }
+                  hasNewData   ? { scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }
+                  : isConnected  ? { opacity: 1 }
+                  : isConnecting ? { opacity: [1, 0.3, 1] }
+                  : { opacity: 0.3 }
                 }
                 transition={
-                  hasNewData ? { duration: 0.6, repeat: 3 }
-                    : isConnecting ? { duration: 1, repeat: Infinity }
-                      : {}
+                  hasNewData   ? { duration: 0.6, repeat: 3 }
+                  : isConnecting ? { duration: 1, repeat: Infinity }
+                  : {}
                 }
                 style={{
                   background: isConnected ? '#10B981' : isConnecting ? '#F59E0B' : '#6B7280',
@@ -178,7 +178,7 @@ export default function Sidebar() {
                 className={styles.newDataBanner}
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
+                exit={{    opacity: 0, height: 0 }}
               >
                 <Wifi size={12} />
                 {newTenders} New Tender{newTenders > 1 ? 's' : ''} Ingested
@@ -213,7 +213,7 @@ export default function Sidebar() {
                       key={item.badge}
                       className={clsx(styles.navBadge, isActive && styles.navBadgeActive)}
                       initial={{ scale: 0.7, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
+                      animate={{ scale: 1,   opacity: 1 }}
                       transition={{ type: 'spring', stiffness: 400 }}
                     >
                       {item.badge}
@@ -257,7 +257,7 @@ export default function Sidebar() {
                 className={styles.systemPanel}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
+                exit={{    opacity: 0, y: 8 }}
               >
                 <div className={styles.systemPanelHeader}>
                   <div>

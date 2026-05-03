@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Database, Layers, ArrowRight,
   Shield, Globe, BarChart3,
-  Bell, Zap, Sparkles,
+  Bell, Zap,
 } from 'lucide-react';
 import AustraliaMap from '../../components/home/AustraliaMap';
 import { useOverviewStats, useStateStats, useSectorStats } from '../../hooks/useTenders';
@@ -182,7 +182,6 @@ export default function HomePage() {
         <div className={styles.welcomeRight}>
           <div className={styles.newTendersBlock}>
             <div className={styles.newTendersHeader}>
-              <Sparkles size={12} className={styles.newTendersIcon} />
               <span className={styles.newTendersLabel}>New since last visit</span>
             </div>
             {overviewLoading ? (
@@ -195,7 +194,7 @@ export default function HomePage() {
               </div>
             ) : (
               <div className={styles.newTendersCount}>
-                +{formatNumber(newSinceLastVisit)} tenders
+                +{formatNumber(newSinceLastVisit)} Tenders
               </div>
             )}
             {lastVisitTs && (
