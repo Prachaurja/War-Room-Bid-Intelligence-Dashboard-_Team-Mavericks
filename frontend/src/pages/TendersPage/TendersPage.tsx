@@ -54,7 +54,7 @@ const STATUS_CARDS: {
   {
     id:         'active',
     label:      'Active Bids',
-    desc:       'Open — accepting submissions now',
+    desc:       'Open — Accepting Submissions Now',
     icon:       Activity,
     color:      '#10B981',
     bg:         'rgba(16,185,129,0.07)',
@@ -66,7 +66,7 @@ const STATUS_CARDS: {
   {
     id:         'upcoming',
     label:      'Upcoming Bids',
-    desc:       'Planned — not yet released',
+    desc:       'Planned — Not Yet Released',
     icon:       Clock,
     color:      '#F59E0B',
     bg:         'rgba(245,158,11,0.07)',
@@ -78,7 +78,7 @@ const STATUS_CARDS: {
   {
     id:         'closed',
     label:      'Closed Bids',
-    desc:       'Awarded — historical contracts',
+    desc:       'Awarded — Historical Contracts',
     icon:       CheckCircle2,
     color:      '#6366F1',
     bg:         'rgba(99,102,241,0.07)',
