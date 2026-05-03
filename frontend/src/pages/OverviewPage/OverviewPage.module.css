@@ -470,3 +470,55 @@
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Stat grid header with time window picker ── */
+.statGridHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.statGridLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statGridLabelText {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.windowPicker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 3px;
+}
+
+.windowBtn {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.windowBtn:hover { color: var(--text-secondary); }
+
+.windowBtnActive {
+  background: var(--card-bg);
+  color: var(--accent-lighter);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-accent);
+}

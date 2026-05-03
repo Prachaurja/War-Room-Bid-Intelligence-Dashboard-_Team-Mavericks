@@ -106,7 +106,7 @@ const STATUS_CARDS: {
   {
     id: 'active',
     label: 'Active Bids',
-    desc: 'Open — accepting submissions now',
+    desc: 'Open — Accepting Submissions Now',
     icon: Activity,
     color: '#10B981',
     bg: 'rgba(16,185,129,0.07)',
@@ -118,7 +118,7 @@ const STATUS_CARDS: {
   {
     id: 'upcoming',
     label: 'Upcoming Bids',
-    desc: 'Planned — not yet released',
+    desc: 'Planned — Not Yet Released',
     icon: Clock,
     color: '#F59E0B',
     bg: 'rgba(245,158,11,0.07)',
@@ -193,11 +193,15 @@ export default function TendersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const yearParam = searchParams.get('year') ?? '';
   const publishedYearParam = searchParams.get('published_year') ?? '';
+  const urlState = searchParams.get('state') ?? '';
+  const urlStatus = searchParams.get('status') as Tab | null;
   const urlYear = publishedYearParam || yearParam;
   const urlYearMode: YearMode = publishedYearParam ? 'published' : 'close';
-  const [activeTab, setActiveTab] = useState<Tab>('active');
+  const [activeTab, setActiveTab] = useState<Tab>(
+    urlStatus && ['active', 'upcoming', 'closed'].includes(urlStatus) ? urlStatus : 'active',
+  );
   const [sector, setSector] = useState('');
-  const [state, setState] = useState('');
+  const [state, setState] = useState(urlState);
   const [yearMode, setYearMode] = useState<YearMode>(urlYearMode);
   const [year, setYear] = useState(urlYear);
   const [sourceName, setSourceName] = useState('');
@@ -240,6 +244,21 @@ export default function TendersPage() {
     [setSearchParams, yearMode],
   );
 
+  const setStateFilter = useCallback(
+    (next: string) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (next.trim()) params.set('state', next);
+          else params.delete('state');
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   const debouncedSearch = useDebounce(search, 400);
 
   useEffect(() => {
@@ -247,6 +266,18 @@ export default function TendersPage() {
     setYear(urlYear);
     setPage(1);
   }, [urlYear, urlYearMode]);
+
+  useEffect(() => {
+    setState(urlState);
+    setPage(1);
+  }, [urlState]);
+
+  useEffect(() => {
+    if (urlStatus && ['active', 'upcoming', 'closed'].includes(urlStatus)) {
+      setActiveTab(urlStatus);
+      setPage(1);
+    }
+  }, [urlStatus]);
 
   const handleSearch = useCallback(
     (v: string) => {
@@ -261,8 +292,9 @@ export default function TendersPage() {
   }, []);
   const handleState = useCallback((v: string) => {
     setState(v);
+    setStateFilter(v);
     setPage(1);
-  }, []);
+  }, [setStateFilter]);
   const handleYearMode = useCallback(
     (v: YearMode) => {
       setYearMode(v);
@@ -296,12 +328,13 @@ export default function TendersPage() {
     setSearch('');
     setSector('');
     setState('');
+    setStateFilter('');
     setYearMode('close');
     setYear('');
     setYearFilter('', 'close');
     setSourceName('');
     setPage(1);
-  }, [setSearch, setYearFilter]);
+  }, [setSearch, setStateFilter, setYearFilter]);
 
   const hasYearFilter = Boolean(year);
   const pageSizeNumber = Number(pageSize);

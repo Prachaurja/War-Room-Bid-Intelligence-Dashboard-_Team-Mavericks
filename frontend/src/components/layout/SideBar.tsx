@@ -2,7 +2,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import {
-  LayoutDashboard, Gavel, BarChart3, FileText,
+  LayoutDashboard, Home, Gavel, BarChart3, FileText,
   Bell, LogOut, Settings, ChevronRight,
   Target, Wifi, X, RefreshCw, Database,
 } from 'lucide-react';
@@ -39,6 +39,7 @@ export default function Sidebar() {
   const hasNewData = newTenders > 0;
 
   const NAV_ITEMS = [
+    { label: 'Home', path: '/home', icon: Home, badge: null },
     { label: 'Overview', path: '/', icon: LayoutDashboard, badge: null },
     { label: 'Tenders', path: '/tenders', icon: Gavel, badge: null },
     { label: 'Analytics', path: '/analytics', icon: BarChart3, badge: null },
