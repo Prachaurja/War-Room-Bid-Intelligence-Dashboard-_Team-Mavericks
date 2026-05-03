@@ -14,6 +14,7 @@ import AnalyticsPage from './pages/AnalyticsPage/AnalyticsPage';
 import ReportsPage from './pages/ReportsPage/ReportsPage';
 import CustomersPage from './pages/CustomersPage/CustomersPage';
 import AlertsPage from './pages/AlertsPage/AlertsPage';
+import DataSourcesPage from './pages/DataSourcesPage/DataSourcesPage';
 import { useUIStore } from './store/ui.store';
 
 const queryClient = new QueryClient({
@@ -71,6 +72,7 @@ export default function App() {
               <Route path="reports"   element={<ReportsPage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="alerts"    element={<AlertsPage />} />
+              <Route path="data-sources" element={<DataSourcesPage />} />
             </Route>
           </Route>
 
