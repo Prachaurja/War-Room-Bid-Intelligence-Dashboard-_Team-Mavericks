@@ -37,7 +37,11 @@ const SOURCE_LABEL: Record<string, string> = {
   nsw_etender: 'NSW eTender',
 };
 
-const getSourceLabel = (s: string) => SOURCE_LABEL[s] ?? s.replace(/_/g, ' ');
+const getSourceLabel = (s: string) => {
+  if (SOURCE_LABEL[s]) return SOURCE_LABEL[s];
+  // Prettify slugs from uploaded sources — e.g. vic_tenders_may_2026 → Vic Tenders May 2026
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
 
 const STATUS_CARDS: {
   id: Tab;
