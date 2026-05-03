@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, Home, Gavel, BarChart3, FileText,
   Users, Bell, Shield, LogOut, Settings, ChevronRight,
-  Target, Wifi, X, RefreshCw, Database, LockKeyhole, Paintbrush,
+  Target, Wifi, X, RefreshCw, Database, LockKeyhole, Paintbrush, HardDrive,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
@@ -47,6 +47,7 @@ export default function Sidebar() {
     { label: 'Reports',   path: '/reports',   icon: FileText,       badge: null },
     { label: 'Customers', path: '/customers', icon: Users,          badge: null },
     { label: 'Alerts',    path: '/alerts',    icon: Bell,           badge: totalBadge > 0 ? String(totalBadge) : null },
+    { label: 'Data Sources', path: '/data-sources', icon: HardDrive, badge: null },
   ];
 
   const initials = user?.name
