@@ -208,7 +208,6 @@ export default function SettingsPage() {
                       onChange={(event) => setProfileForm((prev) => ({ ...prev, avatar: event.target.value }))}
                       placeholder="Paste an image URL or upload a local image"
                     />
-                    <span className={styles.helpText}>Changes are saved only in this browser session storage.</span>
                   </div>
                 </div>
 

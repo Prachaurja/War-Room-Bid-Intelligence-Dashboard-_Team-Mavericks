@@ -304,7 +304,7 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
     if (!form.name.trim()) return;
     const searchName = form.name.trim();
     const toastId = toast.loading(
-      <span>{bold('Creating')} [{searchName}] ...
+      <span>{bold('Creating')} {searchName} ...
       </span>
     );
 
@@ -319,7 +319,7 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
       }) as SavedSearchItem;
 
       toast.dismiss(toastId);
-      toast.success(<span> {bold(`[${searchName}]`)} has been {stateText('Created')}</span>, 
+      toast.success(<span> {bold(`${searchName}`)} has been {stateText('Created')}</span>, 
       {
         className: 'appToastToggleOn',
         action: created?.id
@@ -513,14 +513,14 @@ export default function AlertsPage() {
   const handleToggleSavedSearch = async (searchItem: SavedSearchItem) => {
     const nextEnabled = !searchItem.notifications;
     const toastId = toast.loading(
-      <span>{stateText(nextEnabled ? 'Enabling' : 'Muting')} {bold(`[${searchItem.name}]`)}</span>,
+      <span>{stateText(nextEnabled ? 'Enabling' : 'Muting')} {bold(`${searchItem.name}`)}</span>,
       {className: nextEnabled ? 'appToastToggleOn' : 'appToastToggleOff',}
     );
     try {
       await toggleSavedSearch.mutateAsync(searchItem.id);
 
       toast.dismiss(toastId);
-      toast.success(<span>{bold(`[${searchItem.name}]`)} has been {stateText(nextEnabled ? 'Enabled' : 'Muted')}</span>, {
+      toast.success(<span>{bold(`${searchItem.name}`)} has been {stateText(nextEnabled ? 'Enabled' : 'Muted')}</span>, {
         className: nextEnabled ? 'appToastToggleOn' : 'appToastToggleOff',
         action: {
           label: 'Undo',
@@ -529,7 +529,7 @@ export default function AlertsPage() {
       });
     } catch (error) {
       toast.dismiss(toastId);
-      toast.error(<span>{stateText(`[${searchItem.name}]`)} could not be updated</span>, {
+      toast.error(<span>{stateText(`${searchItem.name}`)} could not be updated</span>, {
          className: 'appToastToggleOff',
          description: "(" + getToastErrorMessage(error) + ")",
       });
@@ -537,7 +537,7 @@ export default function AlertsPage() {
   };
 
   const handleDeleteSavedSearch = async (searchItem: SavedSearchItem) => {
-    const toastId = toast.loading(<span>{stateText("Deleting")} {bold(`[${searchItem.name}]`)}...</span>,
+    const toastId = toast.loading(<span>{stateText("Deleting")} {bold(`${searchItem.name}`)}...</span>,
     {className: 'appToastToggleOff'}
     );
 
@@ -545,13 +545,13 @@ export default function AlertsPage() {
       await deleteSavedSearch.mutateAsync(searchItem.id);
 
       toast.dismiss(toastId);
-      toast.success(<span>{bold(`[${searchItem.name}]`)} has been {stateText('Deleted')}
+      toast.success(<span>{bold(`${searchItem.name}`)} has been {stateText('Deleted')}
       </span>,
       {className: 'appToastToggleOn'}
       );
     } catch (error) {
       toast.dismiss(toastId);
-      toast.error(<span>{bold(`[${searchItem.name}]`)} could not be deleted</span>, {
+      toast.error(<span>{bold(`${searchItem.name}`)} could not be deleted</span>, {
          description: "(" + getToastErrorMessage(error) + ")",
       });
     }
