@@ -61,7 +61,7 @@ const STATUS_CARDS: {
     border:     'rgba(16,185,129,0.22)',
     countKey:   'active_tenders',
     valueKey:   'active_value',
-    statusKeys: ['open', 'active'],
+    statusKeys: ['active'],
   },
   {
     id:         'upcoming',
@@ -206,7 +206,7 @@ export default function TendersPage() {
 
   const rawTenders = useMemo(() => data?.items ?? [], [data?.items]);
   const yearFetchFilters = {
-    status: activeTab === 'active' ? 'open' : activeTab,
+    status: activeTab === 'active' ? 'active' : activeTab,
     sector: sector || undefined,
     state: state || undefined,
     source_name: sourceName || undefined,
