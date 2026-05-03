@@ -7,6 +7,7 @@ import ProtectedRoute from './components/layout/ProtectedRoute';
 import LoginPage from './pages/LoginPage/LoginPage';
 import RegisterPage from './pages/RegisterPage/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
+import HomePage from './pages/HomePage/HomePage';
 import OverviewPage from './pages/OverviewPage/OverviewPage';
 import TendersPage from './pages/TendersPage/TendersPage';
 import AnalyticsPage from './pages/AnalyticsPage/AnalyticsPage';
@@ -32,21 +33,16 @@ export default function App() {
     if (typeof window === 'undefined') {
       return undefined;
     }
-
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const syncResolvedTheme = () => {
       setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
     };
-
     if (themeMode === 'system') {
       syncResolvedTheme();
-
       const onChange = () => syncResolvedTheme();
       mediaQuery.addEventListener('change', onChange);
-
       return () => mediaQuery.removeEventListener('change', onChange);
     }
-
     setResolvedTheme(themeMode);
     return undefined;
   }, [themeMode, setResolvedTheme]);
@@ -61,14 +57,15 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* ── Public routes ── */}
-          <Route path="/login"            element={<LoginPage />} />
-          <Route path="/register"         element={<RegisterPage />} />
-          <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+          <Route path="/login"           element={<LoginPage />} />
+          <Route path="/register"        element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* ── Protected routes ── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
-              <Route index element={<OverviewPage />} />
+              <Route path="home"      element={<HomePage />} />
+              <Route index            element={<OverviewPage />} />
               <Route path="tenders"   element={<TendersPage />} />
               <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="reports"   element={<ReportsPage />} />
@@ -81,6 +78,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+
       <Toaster
         position="top-center"
         toastOptions={{
@@ -95,7 +93,7 @@ export default function App() {
             loader:       'appToastLoader',
           },
           style: {
-            width: '420px',
+            width:    '420px',
             maxWidth: 'calc(100vw - 32px)',
           },
         }}
