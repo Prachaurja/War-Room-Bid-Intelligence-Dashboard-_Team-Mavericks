@@ -7,18 +7,23 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell, BellOff, Plus, Search, X, Trash2, Check,
   CheckCheck, AlertCircle, TrendingUp, FileText,
-  Info, Building2, Mail, MessageSquare, Smartphone,
+  Info, Building2, Mail, MessageSquare, Monitor,
   Target, Clock, MapPin, DollarSign, Save,
   ChevronLeft, ChevronRight, BarChart2, Activity,
 } from 'lucide-react';
 import { formatAgo } from '../../utils/formatters';
-import { loadPref, savePref } from '../../utils/storage';
 import {
   useAlerts, useMarkRead, useMarkAllRead,
   useDeleteAlert, useSavedSearches, useCreateSavedSearch,
   useDeleteSavedSearch, useToggleSavedSearch,
   type AlertItem, type SavedSearchItem,
 } from '../../hooks/useAlerts';
+import { useNotificationPreferences } from '../../hooks/useNotificationPreferences';
+import {
+  getBrowserNotificationPermission,
+  requestBrowserNotificationPermission,
+  showBrowserNotification,
+} from '../../utils/browserNotifications';
 import styles from './AlertsPage.module.css';
 import clsx from 'clsx';
 
@@ -299,7 +304,7 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
     if (!form.name.trim()) return;
     const searchName = form.name.trim();
     const toastId = toast.loading(
-      <span>{bold('Creating')} [{searchName}] ...
+      <span>{bold('Creating')} {searchName} ...
       </span>
     );
 
@@ -314,7 +319,7 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
       }) as SavedSearchItem;
 
       toast.dismiss(toastId);
-      toast.success(<span> {bold(`[${searchName}]`)} has been {stateText('Created')}</span>, 
+      toast.success(<span> {bold(`${searchName}`)} has been {stateText('Created')}</span>, 
       {
         className: 'appToastToggleOn',
         action: created?.id
@@ -447,36 +452,49 @@ export default function AlertsPage() {
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [showModal,      setShowModal]      = useState(false);
   const [page,           setPage]           = useState(1);
-  const [notifPrefs,     setNotifPrefs]     = useState(() =>
-    loadPref('war_room_notif_prefs', { email: true, sms: false, push: true })
-  );
+  const { prefs: notifPrefs, setPrefs: setNotifPrefs } = useNotificationPreferences();
+  const [browserPermission, setBrowserPermission] = useState(getBrowserNotificationPermission());
 
-  const updateNotifPref = (key: 'email' | 'sms' | 'push') => {
+  const updateNotifPref = async (key: 'email' | 'sms' | 'push') => {
     const labels = {
       email: 'Email Alerts',
       sms:   'SMS Alerts',
-      push:  'Push Notifications',
+      push:  'Browser',
     };
     const previousValue = notifPrefs[key];
+    const nextValue = !previousValue;
 
-    setNotifPrefs(prev => {
-      const next = { ...prev, [key]: !prev[key] };
-      savePref('war_room_notif_prefs', next);
-      return next;
-    });
+    if (key === 'push' && nextValue) {
+      const permission = await requestBrowserNotificationPermission();
+      setBrowserPermission(permission);
+
+      if (permission !== 'granted') {
+        toast.error('Browser notifications are blocked', {
+          description: permission === 'denied'
+            ? 'Allow this site in your browser settings, then enable Browser again.'
+            : 'Browser permission is required before this channel can be enabled.',
+        });
+        return;
+      }
+    }
+
+    setNotifPrefs((prev) => ({ ...prev, [key]: nextValue }));
+
+    if (key === 'push' && nextValue) {
+      showBrowserNotification('Browser notifications enabled', {
+        body: 'New bid alerts will now appear in this browser.',
+        tag: 'alerts-browser-enabled',
+      });
+    }
 
     toast(
-      <span>{bold(labels[key])} has been {stateText(previousValue ? 'Disabled' : 'Enabled')}</span>,
+      <span>{bold(labels[key])} has been {stateText(nextValue ? 'Enabled' : 'Disabled')}</span>,
       {
-      className: previousValue ? 'appToastToggleOff' : 'appToastToggleOn',
+      className: nextValue ? 'appToastToggleOn' : 'appToastToggleOff',
       action: {
         label: 'Undo',
         onClick: () => {
-          setNotifPrefs(prev => {
-            const next = { ...prev, [key]: previousValue };
-            savePref('war_room_notif_prefs', next);
-            return next;
-          });
+          setNotifPrefs((prev) => ({ ...prev, [key]: previousValue }));
         },
       },
       },
@@ -495,14 +513,14 @@ export default function AlertsPage() {
   const handleToggleSavedSearch = async (searchItem: SavedSearchItem) => {
     const nextEnabled = !searchItem.notifications;
     const toastId = toast.loading(
-      <span>{stateText(nextEnabled ? 'Enabling' : 'Muting')} {bold(`[${searchItem.name}]`)}</span>,
+      <span>{stateText(nextEnabled ? 'Enabling' : 'Muting')} {bold(`${searchItem.name}`)}</span>,
       {className: nextEnabled ? 'appToastToggleOn' : 'appToastToggleOff',}
     );
     try {
       await toggleSavedSearch.mutateAsync(searchItem.id);
 
       toast.dismiss(toastId);
-      toast.success(<span>{bold(`[${searchItem.name}]`)} has been {stateText(nextEnabled ? 'Enabled' : 'Muted')}</span>, {
+      toast.success(<span>{bold(`${searchItem.name}`)} has been {stateText(nextEnabled ? 'Enabled' : 'Muted')}</span>, {
         className: nextEnabled ? 'appToastToggleOn' : 'appToastToggleOff',
         action: {
           label: 'Undo',
@@ -511,7 +529,7 @@ export default function AlertsPage() {
       });
     } catch (error) {
       toast.dismiss(toastId);
-      toast.error(<span>{stateText(`[${searchItem.name}]`)} could not be updated</span>, {
+      toast.error(<span>{stateText(`${searchItem.name}`)} could not be updated</span>, {
          className: 'appToastToggleOff',
          description: "(" + getToastErrorMessage(error) + ")",
       });
@@ -519,7 +537,7 @@ export default function AlertsPage() {
   };
 
   const handleDeleteSavedSearch = async (searchItem: SavedSearchItem) => {
-    const toastId = toast.loading(<span>{stateText("Deleting")} {bold(`[${searchItem.name}]`)}...</span>,
+    const toastId = toast.loading(<span>{stateText("Deleting")} {bold(`${searchItem.name}`)}...</span>,
     {className: 'appToastToggleOff'}
     );
 
@@ -527,13 +545,13 @@ export default function AlertsPage() {
       await deleteSavedSearch.mutateAsync(searchItem.id);
 
       toast.dismiss(toastId);
-      toast.success(<span>{bold(`[${searchItem.name}]`)} has been {stateText('Deleted')}
+      toast.success(<span>{bold(`${searchItem.name}`)} has been {stateText('Deleted')}
       </span>,
       {className: 'appToastToggleOn'}
       );
     } catch (error) {
       toast.dismiss(toastId);
-      toast.error(<span>{bold(`[${searchItem.name}]`)} could not be deleted</span>, {
+      toast.error(<span>{bold(`${searchItem.name}`)} could not be deleted</span>, {
          description: "(" + getToastErrorMessage(error) + ")",
       });
     }
@@ -896,11 +914,11 @@ export default function AlertsPage() {
             </div>
 
             <div className={styles.notifList}>
-              {([
-                { key: 'email', icon: Mail,         label: 'Email Alerts',       sub: 'Delivered to Your Inbox'    },
-                { key: 'sms',   icon: MessageSquare, label: 'SMS Alerts',         sub: 'Text Message to Your Phone' },
-                { key: 'push',  icon: Smartphone,    label: 'Push Notifications', sub: 'Browser / Mobile Push'      },
-              ] as const).map(channel => (
+                {([
+                  { key: 'email', icon: Mail,         label: 'Email Alerts',       sub: 'Delivered to Your Inbox'    },
+                  { key: 'sms',   icon: MessageSquare, label: 'SMS Alerts',         sub: 'Text Message to Your Phone' },
+                  { key: 'push',  icon: Monitor,       label: 'Browser',            sub: 'Desktop Browser Notifications' },
+                ] as const).map(channel => (
                 <div key={channel.key} className={styles.notifRow}>
                   <div className={styles.notifLeft}>
                     <div className={clsx(
@@ -911,12 +929,16 @@ export default function AlertsPage() {
                     </div>
                     <div>
                       <p className={styles.notifLabel}>{channel.label}</p>
-                      <p className={styles.notifSub}>{channel.sub}</p>
+                      <p className={styles.notifSub}>
+                        {channel.key === 'push'
+                          ? `${channel.sub} · ${browserPermission}`
+                          : channel.sub}
+                      </p>
                     </div>
                   </div>
                   <button
                     className={clsx(styles.toggle, notifPrefs[channel.key] && styles.toggleOn)}
-                    onClick={() => updateNotifPref(channel.key)}
+                    onClick={() => void updateNotifPref(channel.key)}
                   >
                     <span className={styles.toggleThumb} />
                   </button>

@@ -12,6 +12,8 @@ export interface StateStat {
   total_value: number;
 }
 
+type StateCode = 'WA' | 'NT' | 'SA' | 'QLD' | 'NSW' | 'VIC' | 'TAS' | 'ACT';
+
 // ── State metadata ─────────────────────────────────────────────
 const STATE_META: Record<string, { name: string; color: string }> = {
   WA:  { name: 'Western Australia',             color: '#EC4899' },
@@ -24,30 +26,38 @@ const STATE_META: Record<string, { name: string; color: string }> = {
   ACT: { name: 'Australian Capital Territory',  color: '#F97316' },
 };
 
-// ── Accurate D3 Mercator projected paths
-// Centre: 133.5°E 27.8°S, Scale: 780, ViewBox: 0 0 800 640
-// Generated from detailed ABS-aligned coordinate arrays
-const STATE_PATHS: Record<string, string> = {
-  WA:  'M 119.83,428.13 L 134.54,416.68 L 148.15,408.45 L 157.68,401.9 L 157.68,367.98 L 142.7,336.37 L 136.58,291.94 L 127.73,252.48 L 135.9,215.42 L 148.15,208.26 L 161.76,199.68 L 182.18,203.89 L 195.8,198.52 L 216.22,190.83 L 238.0,176.7 L 246.71,161.5 L 254.61,158.64 L 261.82,153.51 L 270.67,141.99 L 277.48,133.35 L 284.28,124.45 L 297.9,110.66 L 309.61,105.75 L 318.32,109.39 L 329.21,117.26 L 338.74,120.64 L 338.74,282.52 L 338.74,328.57 L 338.74,407.96 L 325.13,407.96 L 270.67,407.96 L 216.22,411.74 L 161.76,421.65 L 119.83,428.13 Z',
-  NT:  'M 338.74,120.64 L 352.35,109.53 L 365.97,101.12 L 379.58,93.57 L 393.19,84.5 L 406.81,80.74 L 420.42,81.72 L 434.03,87.29 L 443.43,103.64 L 440.84,108.27 L 431.31,121.91 L 434.03,136.46 L 445.06,131.79 L 447.65,125.15 L 458.81,132.07 L 461.26,143.55 L 461.26,282.52 L 338.74,282.52 Z',
-  SA:  'M 338.74,282.52 L 461.26,282.52 L 502.1,282.52 L 502.1,328.57 L 502.1,408.45 L 501.69,476.82 L 488.49,472.33 L 481.68,467.18 L 468.07,472.33 L 454.45,437.15 L 440.84,427.46 L 429.95,424.14 L 420.42,416.52 L 413.61,392.28 L 400.0,379.52 L 387.61,375.82 L 379.44,367.82 L 365.97,360.01 L 352.35,350.51 L 338.74,328.57 Z',
-  QLD: 'M 461.26,282.52 L 502.1,282.52 L 502.1,328.57 L 611.01,328.57 L 624.62,322.36 L 651.85,315.4 L 672.27,313.08 L 673.63,305.39 L 674.04,267.44 L 668.19,252.48 L 658.66,222.9 L 638.24,186.5 L 624.62,164.93 L 604.2,115.29 L 583.78,87.29 L 563.36,62.0 L 522.93,62.27 L 515.72,66.43 L 502.1,94.27 L 488.49,122.33 L 481.68,136.46 L 473.51,152.08 L 461.26,157.79 Z',
-  NSW: 'M 502.1,328.57 L 611.01,328.57 L 624.62,322.36 L 651.85,315.4 L 672.27,313.08 L 673.63,336.37 L 665.46,360.01 L 651.85,384.03 L 642.32,407.79 L 638.24,400.26 L 636.88,424.97 L 627.35,441.69 L 624.22,467.18 L 616.46,467.18 L 604.2,467.18 L 590.59,467.18 L 576.98,475.79 L 563.36,475.79 L 556.56,472.33 L 542.94,472.33 L 529.33,479.25 L 515.72,484.45 L 502.1,477.0 L 502.1,408.45 Z',
-  VIC: 'M 502.1,408.45 L 502.1,477.0 L 515.72,484.45 L 529.33,479.25 L 542.94,472.33 L 556.56,472.33 L 563.36,475.79 L 576.98,475.79 L 590.59,467.18 L 604.2,467.18 L 616.46,467.18 L 624.22,467.18 L 617.82,484.45 L 604.2,484.45 L 583.78,493.18 L 570.17,496.69 L 556.56,493.18 L 542.94,484.45 L 529.33,493.18 L 515.72,495.81 L 508.91,490.56 Z',
-  TAS: 'M 556.56,524.77 L 570.17,519.74 L 583.78,519.74 L 597.4,525.13 L 604.2,537.78 L 601.48,556.1 L 597.4,565.37 L 583.78,576.59 L 570.17,576.59 L 556.56,565.37 L 549.75,556.1 L 549.75,537.78 Z',
-  ACT: 'M 608.29,426.96 L 616.46,426.96 L 616.46,440.34 L 608.29,440.34 Z',
+// Simplified projected state paths. These preserve the real state boundaries
+// while keeping the SVG light enough to maintain by hand.
+const STATE_PATHS: Record<StateCode, string> = {
+  WA: 'M159.56,426.85l2.64-11.18,4.03-4.49-2.67-9.67-12.33-31-32.67-55.67,5.67-8-13.67-28-1.33-34,7,4,28.67-30,37-14.33,26.67-10.33,13-21.33-3.33-18.33,12-13.67,9.33,11,1-15,13.67.33.33-14.67,29.67-26.67,19.33,6,17.67,7.33,9.52,169.8,4.26,88.73-56.11,21.14-12,18-51.47,8.33-15.19,20-40.67-8.33Z',
+  NT: 'M321.22,109.19l13-1.67-4-9.67,22.67-34,24-1-1.67-14,41.94,15,17.73-6.67.33,7,9.33-.33-21,40.33,19.67,16.33,18.74,7.3-1.46,153.02-129.76-1.85-9.52-169.8Z',
+  SA: 'M330.74,278.99l129.76,1.85h40.84l-2.88,46.05-4.1,74.06-2.98,62.62-20.25-19.25,1.36-20.85-15.03-.48,1.33-12.67-15.69,1.81,6.36-20.15-26.67,18.33-26.33-36-9-7-37.33-6.67-15.13,5.93-4.26-87.6Z',
+  QLD: 'M461,280.34h40.84l-2.48,47.61,110.62,1.02,24.88,3.31,9.33,8.17,5.5-6.33,20.09-.5-1.23-36.75-2.67-13.67-20.44-29.95-1.56-14.71-12.92-1.38-10.33-38-35.96-29.33v-21.67l-6.37-10-1.67-30-9.8-10.69-10.2.69-8-33.33-12-21.67-13,24-2.67,47-23,33.67-36-20-.96,152.52Z',
+  NSW: 'M498.86,328.44l109.43.87,26.07,3.47,9.33,8.17,5.5-6.33,20.59-1-.42,14.5-17.51,35.42-13.63,13.97-14,22-22.03,42.94-22.33-12.5-2-12.67-40.67-2.5-11.33-11.83-5.19-10.19-26.31-11.81,4.5-72.5Z',
+  VIC: 'M494.36,400.94l26.63,12.44,3.55,6.97,12.65,14.42,40.67,2.5,1.83,11.56,22.51,13.61-9.87,3.18-21.79,6.32-17.5,10.5-15.83-13.17-20.5,9.17-25.31-14.88,2.98-62.62Z',
+  TAS: 'M533.53,505.94l16,9,23-1.17-.67,19.67-15.83,17.67-13-.5-5.83-14.67-1.17-14-4.67-8.5,2.17-7.5Z',
+  ACT: 'M598.11,428.44h0c2.26,0,4.09,1.83,4.09,4.09v5.21c0,2.26-1.83,4.09-4.09,4.09h0c-2.26,0-4.09-1.83-4.09-4.09v-5.21c0-2.26,1.83-4.09,4.09-4.09Z',
 };
 
 // ── Label positions ────────────────────────────────────────────
 const STATE_LABELS: Record<string, { x: number; y: number }> = {
-  WA:  { x: 215, y: 300 },
-  NT:  { x: 395, y: 210 },
-  SA:  { x: 415, y: 385 },
-  QLD: { x: 560, y: 205 },
-  NSW: { x: 595, y: 385 },
-  VIC: { x: 560, y: 458 },
-  TAS: { x: 578, y: 550 },
-  ACT: { x: 622, y: 433 },
+  WA: { x: 225, y: 295 },
+  NT: { x: 390, y: 200 },
+  SA: { x: 408, y: 350 },
+  QLD: { x: 550, y: 260 },
+  NSW: { x: 582, y: 380 },
+  VIC: { x: 538, y: 480 },
+  TAS: { x: 552, y: 550 },
+  ACT: { x: 598, y: 436 },
+};
+
+const ACT_HIT_TARGET = {
+  x: 574,
+  y: 416,
+  width: 48,
+  height: 42,
+  labelX: 642,
+  labelY: 434,
 };
 
 // ── Full name → abbreviation normaliser ───────────────────────
@@ -104,6 +114,10 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
     setSelectedState(prev => prev === key ? null : key);
   };
 
+  const goToStateTenders = (key: string) => {
+    navigate(`/tenders?state=${encodeURIComponent(key)}&status=active`);
+  };
+
   return (
     <div className={styles.mapContainer}>
 
@@ -148,12 +162,12 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
           ))}
 
           {/* Ocean labels */}
-          <text x="62" y="580" fontSize="10" fill="rgba(99,102,241,0.28)"
+          <text x="62" y="100" fontSize="10" fill="rgba(99,102,241,0.28)"
             fontStyle="italic" letterSpacing="2">INDIAN OCEAN</text>
           <text x="720" y="300" fontSize="10" fill="rgba(99,102,241,0.28)"
             fontStyle="italic" letterSpacing="2"
             transform="rotate(90,720,300)">PACIFIC OCEAN</text>
-          <text x="480" y="628" fontSize="10" fill="rgba(99,102,241,0.28)"
+          <text x="250" y="500" fontSize="10" fill="rgba(99,102,241,0.28)"
             fontStyle="italic" letterSpacing="2">SOUTHERN OCEAN</text>
 
           {/* State shapes */}
@@ -209,6 +223,24 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
                   onClick={() => handleStateClick(key)}
                 />
 
+                {isSmall && (
+                  <rect
+                    x={ACT_HIT_TARGET.x}
+                    y={ACT_HIT_TARGET.y}
+                    width={ACT_HIT_TARGET.width}
+                    height={ACT_HIT_TARGET.height}
+                    rx="10"
+                    fill="transparent"
+                    stroke={isHovered || isSelected ? meta.color : 'transparent'}
+                    strokeWidth="1"
+                    strokeDasharray="3 3"
+                    style={{ cursor: 'pointer' }}
+                    onMouseMove={e => handleMouseMove(key, e as unknown as React.MouseEvent<SVGPathElement>)}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={() => handleStateClick(key)}
+                  />
+                )}
+
                 {/* Label */}
                 {!isSmall && (
                   <text
@@ -222,6 +254,32 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
                   >
                     {key}
                   </text>
+                )}
+
+                {isSmall && (
+                  <>
+                    <line
+                      x1={labelPos.x + 4}
+                      y1={labelPos.y}
+                      x2={ACT_HIT_TARGET.labelX - 16}
+                      y2={ACT_HIT_TARGET.labelY - 4}
+                      stroke={isHovered || isSelected ? meta.color : 'rgba(255,255,255,0.48)'}
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    <text
+                      x={ACT_HIT_TARGET.labelX}
+                      y={ACT_HIT_TARGET.labelY}
+                      textAnchor="start"
+                      fontSize="11"
+                      fontWeight={isSelected || isHovered ? '800' : '700'}
+                      fill={isSelected || isHovered ? meta.color : 'rgba(255,255,255,0.86)'}
+                      style={{ pointerEvents: 'none', userSelect: 'none', transition: 'fill 0.2s' }}
+                    >
+                      ACT
+                    </text>
+                  </>
                 )}
 
                 {/* Count */}
@@ -304,7 +362,7 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
                     </div>
                     <p className={styles.tooltipCta}>
                       {stat?.count
-                        ? 'Click to filter tenders →'
+                        ? 'Click to inspect tenders'
                         : 'No tenders for this state'}
                     </p>
                   </>
@@ -386,7 +444,7 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
                   <button
                     className={styles.statePanelViewBtn}
                     style={{ background: STATE_META[selectedState]?.color + '18', borderColor: STATE_META[selectedState]?.color + '40', color: STATE_META[selectedState]?.color }}
-                    onClick={() => navigate(`/tenders?state=${selectedState}&status=active`)}
+                    onClick={() => goToStateTenders(selectedState)}
                   >
                     View {selectedState} Tenders →
                   </button>

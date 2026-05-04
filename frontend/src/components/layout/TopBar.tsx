@@ -10,7 +10,6 @@ import {
   Clock3,
   CheckCheck,
   X,
-  CheckCircle2,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,8 +17,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAlerts, useMarkAllRead, useMarkRead } from '../../hooks/useAlerts';
-import { type ThemeMode, useUIStore } from '../../store/ui.store';
+import { useUIStore } from '../../store/ui.store';
 import { formatAgo } from '../../utils/formatters';
+import ThemePreviewSelector from '../theme/ThemePreviewSelector';
 import styles from './TopBar.module.css';
 
 const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
@@ -27,8 +27,8 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/tenders':   { title: 'Tender Management', sub: 'Track and manage government tenders' },
   '/analytics': { title: 'Analytics',         sub: 'Deep dive into bid performance' },
   '/reports':   { title: 'Reports',           sub: 'Generate and export reports' },
-  '/customers': { title: 'Customers',         sub: 'Manage customer relationships' },
   '/alerts':    { title: 'Alerts',            sub: 'Notifications and saved searches' },
+  '/settings':  { title: 'Settings',          sub: 'Profile, appearance, and notification channels' },
 };
 
 interface TopBarProps {
@@ -79,11 +79,6 @@ export default function TopBar({ pathname }: TopBarProps) {
   }[themeMode];
 
   const ThemeIcon = themeConfig.icon;
-  const themeOptions: Array<{ mode: ThemeMode; title: string; subtitle: string; previewClass: string; icon: React.ElementType }> = [
-    { mode: 'light', title: 'Light', subtitle: 'Clean daytime workspace', previewClass: styles.previewLight, icon: Sun },
-    { mode: 'dark', title: 'Dark', subtitle: 'Deep contrast workspace', previewClass: styles.previewDark, icon: Moon },
-    { mode: 'system', title: 'System', subtitle: 'Follow device setting', previewClass: styles.previewSystem, icon: Monitor },
-  ];
   const unreadAlerts = (alertsData ?? []).filter((alert) => !alert.read);
   const recentAlerts = [...(alertsData ?? [])].slice(0, 5);
 
@@ -121,14 +116,6 @@ export default function TopBar({ pathname }: TopBarProps) {
       run: () => navigate('/reports'),
     },
     {
-      id: 'customers',
-      kind: 'action',
-      title: 'Open Customers',
-      description: 'Manage customer and agency contacts',
-      keywords: ['customers', 'clients', 'contacts'],
-      run: () => navigate('/customers'),
-    },
-    {
       id: 'alerts',
       kind: 'action',
       title: 'Open Alerts',
@@ -153,6 +140,14 @@ export default function TopBar({ pathname }: TopBarProps) {
       description: `Current resolved theme is ${resolvedTheme}`,
       keywords: ['theme', 'dark', 'light', 'system', 'appearance'],
       run: () => setAppearanceOpen(true),
+    },
+    {
+      id: 'settings',
+      kind: 'action',
+      title: 'Open Settings',
+      description: 'Profile, theme, and notification preferences',
+      keywords: ['settings', 'profile', 'appearance', 'notifications'],
+      run: () => navigate('/settings'),
     },
   ], [navigate, resolvedTheme]);
 
@@ -500,49 +495,7 @@ export default function TopBar({ pathname }: TopBarProps) {
                   <div className={styles.appearanceSection}>
                     <p className={styles.appearanceSectionTitle}>Interface theme</p>
                     <p className={styles.appearanceSectionSub}>Choose how Dashboard should look.</p>
-                    <div className={styles.themePreviewGrid}>
-                      {themeOptions.map((option) => {
-                        const OptionIcon = option.icon;
-                        const selected = themeMode === option.mode;
-
-                        return (
-                          <button
-                            key={option.mode}
-                            className={`${styles.themePreviewCard} ${selected ? styles.themePreviewActive : ''}`}
-                            onClick={() => setThemeMode(option.mode)}
-                          >
-                            <div className={`${styles.themePreviewArt} ${option.previewClass}`}>
-                              <div className={styles.previewWindowDots}>
-                                <span />
-                                <span />
-                                <span />
-                              </div>
-                              <div className={styles.previewSidebar}>
-                                <span />
-                                <span />
-                                <span />
-                                <span />
-                              </div>
-                              <div className={styles.previewContent}>
-                                <span className={styles.previewLineShort} />
-                                <span className={styles.previewLineMain} />
-                                <span className={styles.previewLineMuted} />
-                                <span className={styles.previewLineSmall} />
-                              </div>
-                            </div>
-                            <div className={styles.themePreviewFooter}>
-                              <div>
-                                <span className={styles.themePreviewName}>{option.title}</span>
-                                <span className={styles.themePreviewDesc}>{option.subtitle}</span>
-                              </div>
-                              <span className={styles.themePreviewCheck}>
-                                {selected ? <CheckCircle2 size={17} /> : <OptionIcon size={16} />}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <ThemePreviewSelector selectedTheme={themeMode} onSelect={setThemeMode} />
                   </div>
                 </div>
               </motion.div>
