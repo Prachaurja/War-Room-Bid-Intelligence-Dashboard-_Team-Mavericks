@@ -37,13 +37,13 @@ export default function Sidebar() {
   const hasNewData   = newTenders > 0;
 
   const NAV_ITEMS = [
-    { label: 'Home',         path: '/home',         icon: Home,            badge: null },
-    { label: 'Overview',     path: '/',              icon: LayoutDashboard, badge: null },
-    { label: 'Tenders',      path: '/tenders',       icon: Gavel,           badge: null },
-    { label: 'Analytics',    path: '/analytics',     icon: BarChart3,       badge: null },
-    { label: 'Reports',      path: '/reports',       icon: FileText,        badge: null },
-    { label: 'Alerts',       path: '/alerts',        icon: Bell,            badge: totalBadge > 0 ? String(totalBadge) : null },
-    { label: 'Data Sources', path: '/data-sources',  icon: HardDrive,       badge: null },
+    { label: 'Home',         path: '/',             icon: Home,            badge: null },
+    { label: 'Overview',     path: '/overview',     icon: LayoutDashboard, badge: null },
+    { label: 'Tenders',      path: '/tenders',      icon: Gavel,           badge: null },
+    { label: 'Analytics',    path: '/analytics',    icon: BarChart3,       badge: null },
+    { label: 'Reports',      path: '/reports',      icon: FileText,        badge: null },
+    { label: 'Alerts',       path: '/alerts',       icon: Bell,            badge: totalBadge > 0 ? String(totalBadge) : null },
+    { label: 'Data Sources', path: '/data-sources', icon: HardDrive,       badge: null },
   ];
 
   const initials = user?.name

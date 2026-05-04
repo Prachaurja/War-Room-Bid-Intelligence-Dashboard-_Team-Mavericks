@@ -65,8 +65,9 @@ export default function App() {
           {/* ── Protected routes ── */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
-              <Route path="home"      element={<HomePage />} />
-              <Route index            element={<OverviewPage />} />
+              <Route index            element={<HomePage />} />
+              <Route path="home"      element={<Navigate to="/" replace />} />
+              <Route path="overview"  element={<OverviewPage />} />
               <Route path="tenders"   element={<TendersPage />} />
               <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="reports"   element={<ReportsPage />} />
