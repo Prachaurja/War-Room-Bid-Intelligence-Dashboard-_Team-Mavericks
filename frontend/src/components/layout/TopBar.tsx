@@ -9,15 +9,17 @@ import {
   ArrowRight,
   Clock3,
   CheckCheck,
+  X,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAlerts, useMarkAllRead, useMarkRead } from '../../hooks/useAlerts';
-import { useTenders } from '../../hooks/useTenders';
 import { useUIStore } from '../../store/ui.store';
 import { formatAgo } from '../../utils/formatters';
+import ThemePreviewSelector from '../theme/ThemePreviewSelector';
 import styles from './TopBar.module.css';
 
 const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
@@ -25,8 +27,8 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/tenders':   { title: 'Tender Management', sub: 'Track and manage government tenders' },
   '/analytics': { title: 'Analytics',         sub: 'Deep dive into bid performance' },
   '/reports':   { title: 'Reports',           sub: 'Generate and export reports' },
-  '/customers': { title: 'Customers',         sub: 'Manage customer relationships' },
   '/alerts':    { title: 'Alerts',            sub: 'Notifications and saved searches' },
+  '/settings':  { title: 'Settings',          sub: 'Profile, appearance, and notification channels' },
 };
 
 interface TopBarProps {
@@ -35,7 +37,7 @@ interface TopBarProps {
 
 interface SearchAction {
   id: string;
-  kind: 'action' | 'tender' | 'alert';
+  kind: 'action';
   title: string;
   description: string;
   keywords: string[];
@@ -43,17 +45,17 @@ interface SearchAction {
 }
 
 export default function TopBar({ pathname }: TopBarProps) {
-  const { toggleSidebar, themeMode, resolvedTheme, cycleThemeMode } = useUIStore();
+  const { toggleSidebar, themeMode, resolvedTheme, setThemeMode } = useUIStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: alertsData } = useAlerts();
-  const { data: tendersData } = useTenders({ page: 1, page_size: 50 });
   const markRead = useMarkRead();
   const markAllRead = useMarkAllRead();
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const notifRef = useRef<HTMLDivElement>(null);
@@ -79,7 +81,6 @@ export default function TopBar({ pathname }: TopBarProps) {
   const ThemeIcon = themeConfig.icon;
   const unreadAlerts = (alertsData ?? []).filter((alert) => !alert.read);
   const recentAlerts = [...(alertsData ?? [])].slice(0, 5);
-  const tenders = tendersData?.items ?? [];
 
   const searchActions = useMemo<SearchAction[]>(() => [
     {
@@ -115,14 +116,6 @@ export default function TopBar({ pathname }: TopBarProps) {
       run: () => navigate('/reports'),
     },
     {
-      id: 'customers',
-      kind: 'action',
-      title: 'Open Customers',
-      description: 'Manage customer and agency contacts',
-      keywords: ['customers', 'clients', 'contacts'],
-      run: () => navigate('/customers'),
-    },
-    {
       id: 'alerts',
       kind: 'action',
       title: 'Open Alerts',
@@ -143,46 +136,59 @@ export default function TopBar({ pathname }: TopBarProps) {
     {
       id: 'theme',
       kind: 'action',
-      title: `Theme: ${themeConfig.label}`,
+      title: 'Appearance',
       description: `Current resolved theme is ${resolvedTheme}`,
       keywords: ['theme', 'dark', 'light', 'system', 'appearance'],
-      run: () => cycleThemeMode(),
+      run: () => setAppearanceOpen(true),
     },
-  ], [navigate, themeConfig.label, resolvedTheme, cycleThemeMode]);
+    {
+      id: 'settings',
+      kind: 'action',
+      title: 'Open Settings',
+      description: 'Profile, theme, and notification preferences',
+      keywords: ['settings', 'profile', 'appearance', 'notifications'],
+      run: () => navigate('/settings'),
+    },
+  ], [navigate, resolvedTheme]);
 
-  const tenderActions = useMemo<SearchAction[]>(
-    () => tenders.map((tender) => ({
-      id: `tender-${tender.id}`,
-      kind: 'tender',
-      title: tender.title,
-      description: `${tender.agency} · ${tender.state ?? 'Unknown State'} · ${tender.status}`,
-      keywords: [
-        tender.agency,
-        tender.state ?? '',
-        tender.sector ?? '',
-        tender.source_name,
-        tender.description ?? '',
-      ],
-      run: () => navigate(`/tenders?search=${encodeURIComponent(tender.title)}`),
-    })),
-    [tenders, navigate],
-  );
+  const tenderSearchAction = useMemo<SearchAction[]>(() => {
+    const query = searchQuery.trim();
+    if (!query) return [];
 
-  const alertActions = useMemo<SearchAction[]>(
-    () => (alertsData ?? []).map((alert) => ({
-      id: `alert-${alert.id}`,
-      kind: 'alert',
-      title: alert.title,
-      description: alert.description ?? `Alert · ${alert.priority}`,
-      keywords: [alert.type, alert.priority, alert.description ?? ''],
-      run: () => navigate(`/alerts?search=${encodeURIComponent(alert.title)}`),
-    })),
-    [alertsData, navigate],
-  );
+    if (/^\d{4}$/.test(query)) {
+      return [
+        {
+          id: 'search-tenders-close-year',
+          kind: 'action',
+          title: `Search Tender close date year: ${query}`,
+          description: 'Open Tender page and filter by close date year',
+          keywords: ['tender', 'tenders', 'bid', 'bids', 'contracts', 'close date', 'year', query],
+          run: () => navigate(`/tenders?year=${encodeURIComponent(query)}`),
+        },
+        {
+          id: 'search-tenders-published-year',
+          kind: 'action',
+          title: `Search Tender published year: ${query}`,
+          description: 'Open Tender page and filter by published date year',
+          keywords: ['tender', 'tenders', 'bid', 'bids', 'contracts', 'published date', 'publish year', query],
+          run: () => navigate(`/tenders?published_year=${encodeURIComponent(query)}`),
+        },
+      ];
+    }
+
+    return [{
+      id: 'search-tenders-query',
+      kind: 'action',
+      title: `Search Tenders for "${query}"`,
+      description: 'Open Tender page and search tender titles and agencies',
+      keywords: ['tender', 'tenders', 'bid', 'bids', 'contracts', query],
+      run: () => navigate(`/tenders?search=${encodeURIComponent(query)}`),
+    }];
+  }, [navigate, searchQuery]);
 
   const searchableActions = useMemo(
-    () => [...searchActions, ...tenderActions, ...alertActions],
-    [searchActions, tenderActions, alertActions],
+    () => [...tenderSearchAction, ...searchActions],
+    [tenderSearchAction, searchActions],
   );
 
   const filteredSearchActions = useMemo(() => {
@@ -200,12 +206,8 @@ export default function TopBar({ pathname }: TopBarProps) {
   const groupedSearchActions = useMemo(() => {
     const sections: Array<{ label: string; items: SearchAction[] }> = [];
     const actions = filteredSearchActions.filter((item) => item.kind === 'action');
-    const tenderResults = filteredSearchActions.filter((item) => item.kind === 'tender').slice(0, 6);
-    const alertResults = filteredSearchActions.filter((item) => item.kind === 'alert').slice(0, 6);
 
     if (actions.length > 0) sections.push({ label: 'Quick Actions', items: actions });
-    if (tenderResults.length > 0) sections.push({ label: 'Tenders', items: tenderResults });
-    if (alertResults.length > 0) sections.push({ label: 'Alerts', items: alertResults });
 
     return sections;
   }, [filteredSearchActions]);
@@ -242,6 +244,7 @@ export default function TopBar({ pathname }: TopBarProps) {
       if (event.key === 'Escape') {
         setSearchOpen(false);
         setNotifOpen(false);
+        setAppearanceOpen(false);
       }
     };
 
@@ -253,6 +256,11 @@ export default function TopBar({ pathname }: TopBarProps) {
     action.run();
     setSearchOpen(false);
     setSearchQuery('');
+  };
+
+  const runFirstSearchAction = () => {
+    const firstAction = groupedSearchActions[0]?.items[0];
+    if (firstAction) runSearchAction(firstAction);
   };
 
   return (
@@ -270,12 +278,12 @@ export default function TopBar({ pathname }: TopBarProps) {
       <div className={styles.right}>
         <button
           className={styles.themeBtn}
-          onClick={cycleThemeMode}
-          title={`Theme mode: ${themeConfig.label} (${resolvedTheme})`}
-          aria-label={`Theme mode: ${themeConfig.label}. Click to switch theme mode.`}
+          onClick={() => setAppearanceOpen(true)}
+          title="Appearance"
+          aria-label="Open appearance settings"
         >
           <ThemeIcon size={15} />
-          <span className={styles.themeLabel}>{themeConfig.label}</span>
+          <span className={styles.themeLabel}>Appearance</span>
         </button>
 
         <button
@@ -304,8 +312,16 @@ export default function TopBar({ pathname }: TopBarProps) {
             {unreadAlerts.length > 0 && <span className={styles.notifDot} />}
           </button>
 
-          {notifOpen && (
-            <div className={styles.notifPanel}>
+          <AnimatePresence>
+            {notifOpen && (
+              <motion.div
+                className={styles.notifPanel}
+                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                transition={{ type: 'spring', stiffness: 360, damping: 30 }}
+                style={{ transformOrigin: 'top right' }}
+              >
               <div className={styles.panelHeader}>
                 <div>
                   <p className={styles.panelTitle}>Notifications</p>
@@ -369,22 +385,44 @@ export default function TopBar({ pathname }: TopBarProps) {
                 View all alerts
                 <ArrowRight size={13} />
               </button>
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
-      {searchOpen && createPortal(
-        <div className={styles.searchOverlay} onClick={() => setSearchOpen(false)}>
-          <div className={styles.searchModal} onClick={(event) => event.stopPropagation()}>
+      {createPortal(
+        <AnimatePresence>
+          {searchOpen && (
+            <motion.div
+              className={styles.searchOverlay}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSearchOpen(false)}
+            >
+          <motion.div
+            className={styles.searchModal}
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className={styles.searchBar}>
               <Search size={16} className={styles.searchBarIcon} />
               <input
                 ref={searchInputRef}
                 className={styles.searchField}
-                placeholder="Search pages and actions..."
+                placeholder="Search tender title, agency, or close date year..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    runFirstSearchAction();
+                  }
+                }}
               />
               <button className={styles.searchClose} onClick={() => setSearchOpen(false)}>
                 Esc
@@ -418,8 +456,52 @@ export default function TopBar({ pathname }: TopBarProps) {
                 ))
               )}
             </div>
-          </div>
-        </div>,
+          </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+
+      {createPortal(
+        <AnimatePresence>
+          {appearanceOpen && (
+            <motion.div
+              className={styles.appearanceOverlay}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAppearanceOpen(false)}
+            >
+              <motion.div
+                className={styles.appearanceModal}
+                initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 16, scale: 0.97 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className={styles.appearanceHeader}>
+                  <div>
+                    <h2 className={styles.appearanceTitle}>Appearance</h2>
+                    <p className={styles.appearanceSub}>Change your workspace theme</p>
+                  </div>
+                  <button className={styles.appearanceClose} onClick={() => setAppearanceOpen(false)}>
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className={styles.appearanceBody}>
+                  <div className={styles.appearanceSection}>
+                    <p className={styles.appearanceSectionTitle}>Interface theme</p>
+                    <p className={styles.appearanceSectionSub}>Choose how Dashboard should look.</p>
+                    <ThemePreviewSelector selectedTheme={themeMode} onSelect={setThemeMode} />
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
         document.body,
       )}
     </header>

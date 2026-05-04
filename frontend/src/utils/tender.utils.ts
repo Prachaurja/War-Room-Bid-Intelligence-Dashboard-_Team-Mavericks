@@ -1,6 +1,11 @@
+export function normalizeTenderStatus(status: string): string {
+    return status === 'open' ? 'active' : status;
+  }
+
 export function getStatusColor(status: string): string {
-    if (status === 'active')   return 'badge-active';
-    if (status === 'upcoming') return 'badge-upcoming';
+    const normalizedStatus = normalizeTenderStatus(status);
+    if (normalizedStatus === 'active')   return 'badge-active';
+    if (normalizedStatus === 'upcoming') return 'badge-upcoming';
     return 'badge-closed';
   }
   

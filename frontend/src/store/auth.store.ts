@@ -7,6 +7,7 @@ interface AuthStore {
   token: string | null;
   isAuthenticated: boolean;
   setAuth: (user: User, token: string) => void;
+  updateUser: (patch: Partial<User>) => void;
   clearAuth: () => void;
 }
 
@@ -22,6 +23,15 @@ export const useAuthStore = create<AuthStore>()(
         localStorage.setItem('wr_user', JSON.stringify(user));
         set({ user, token, isAuthenticated: true });
       },
+
+      updateUser: (patch) =>
+        set((state) => {
+          if (!state.user) return state;
+
+          const nextUser = { ...state.user, ...patch };
+          localStorage.setItem('wr_user', JSON.stringify(nextUser));
+          return { user: nextUser };
+        }),
 
       clearAuth: () => {
         localStorage.removeItem('wr_token');

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { Tender } from '../../types/tender.types';
 import { formatCurrencyFull, formatDate } from '../../utils/formatters';
-import { sectorLabel, sectorColor } from '../../utils/tender.utils';
+import { normalizeTenderStatus, sectorLabel, sectorColor } from '../../utils/tender.utils';
 import styles from './TenderDetailModal.module.css';
 
 interface Props {
@@ -60,6 +60,7 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
   if (!tender) return null;
 
   const hasContractValue = tender.contract_value != null;
+  const status = normalizeTenderStatus(tender.status);
 
   return createPortal(
     <AnimatePresence>
@@ -96,7 +97,7 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
 
           <div className={styles.titleSection}>
             <h2 className={styles.title}>{tender.title}</h2>
-            <span className={styles[`status_${tender.status}`]}>{tender.status}</span>
+            <span className={styles[`status_${status}`]}>{status}</span>
           </div>
 
           {tender.description && (

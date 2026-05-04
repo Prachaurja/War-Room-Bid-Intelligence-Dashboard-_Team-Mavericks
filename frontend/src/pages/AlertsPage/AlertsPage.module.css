@@ -295,7 +295,14 @@
 
 .ssMeta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px; }
 
-.ssNotifBadge { font-size:10px; font-weight:500; }
+.ssNotifBadge {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  font-size:10px;
+  font-weight:500;
+}
+.ssNotifBadge svg { flex-shrink:0; }
 .ssNotifOn    { color:var(--status-active); }
 .ssNotifOff   { color:var(--text-dim); }
 

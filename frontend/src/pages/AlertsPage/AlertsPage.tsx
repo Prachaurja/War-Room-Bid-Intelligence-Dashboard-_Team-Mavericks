@@ -1,23 +1,29 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
+import { isAxiosError } from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Bell, Plus, Search, X, Trash2, Check,
+  Bell, BellOff, Plus, Search, X, Trash2, Check,
   CheckCheck, AlertCircle, TrendingUp, FileText,
-  Info, Building2, Mail, MessageSquare, Smartphone,
+  Info, Building2, Mail, MessageSquare, Monitor,
   Target, Clock, MapPin, DollarSign, Save,
   ChevronLeft, ChevronRight, BarChart2, Activity,
 } from 'lucide-react';
 import { formatAgo } from '../../utils/formatters';
-import { loadPref, savePref } from '../../utils/storage';
 import {
   useAlerts, useMarkRead, useMarkAllRead,
   useDeleteAlert, useSavedSearches, useCreateSavedSearch,
   useDeleteSavedSearch, useToggleSavedSearch,
   type AlertItem, type SavedSearchItem,
 } from '../../hooks/useAlerts';
+import { useNotificationPreferences } from '../../hooks/useNotificationPreferences';
+import {
+  getBrowserNotificationPermission,
+  requestBrowserNotificationPermission,
+  showBrowserNotification,
+} from '../../utils/browserNotifications';
 import styles from './AlertsPage.module.css';
 import clsx from 'clsx';
 
@@ -47,6 +53,18 @@ const SECTOR_LABELS: Record<string, string> = {
   facility_management: 'Facility Mgmt', it_services: 'IT Services',
   healthcare: 'Healthcare', transportation: 'Transportation',
   other: 'Other', '': 'All Sectors',
+};
+
+const bold = (content: React.ReactNode) => <strong>{content}</strong>;
+const stateText = (text: string) => <strong className="appToastStateText">{text}</strong>;
+
+const getToastErrorMessage = (error: unknown) => {
+  if (!isAxiosError(error)) return 'Unexpected error';
+
+  const detail = error.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (error.response?.status) return `Request failed (${error.response.status})`;
+  return error.message || 'Network request failed';
 };
 
 // ── Pagination component ──────────────────────────────────────
@@ -280,19 +298,46 @@ function CreateAlertModal({ onClose }: { onClose: () => void }) {
   });
   const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
   const createSavedSearch = useCreateSavedSearch();
+  const deleteSavedSearch = useDeleteSavedSearch();
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
-    await createSavedSearch.mutateAsync({
-      name:          form.name,
-      sector:        form.sector || undefined,
-      state:         form.state  || undefined,
-      min_value:     Number(form.minValue) || 0,
-      max_value:     Number(form.maxValue) || 0,
-      notifications: form.notifications,
-    });
-    toast.success('Alert has been created');
-    onClose();
+    const searchName = form.name.trim();
+    const toastId = toast.loading(
+      <span>{bold('Creating')} {searchName} ...
+      </span>
+    );
+
+    try {
+      const created = await createSavedSearch.mutateAsync({
+        name:          searchName,
+        sector:        form.sector || undefined,
+        state:         form.state  || undefined,
+        min_value:     Number(form.minValue) || 0,
+        max_value:     Number(form.maxValue) || 0,
+        notifications: form.notifications,
+      }) as SavedSearchItem;
+
+      toast.dismiss(toastId);
+      toast.success(<span> {bold(`${searchName}`)} has been {stateText('Created')}</span>, 
+      {
+        className: 'appToastToggleOn',
+        action: created?.id
+          ? {
+              label: 'Undo',
+              onClick: () => deleteSavedSearch.mutate(created.id),
+            }
+          : undefined,
+      });
+      onClose();
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error('Alert search could not be created', 
+        {
+        className: 'appToastToggleOn',
+        description: "(" + getToastErrorMessage(error) + ")",
+      });
+    }
   };
 
   const modal = (
@@ -407,16 +452,53 @@ export default function AlertsPage() {
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [showModal,      setShowModal]      = useState(false);
   const [page,           setPage]           = useState(1);
-  const [notifPrefs,     setNotifPrefs]     = useState(() =>
-    loadPref('war_room_notif_prefs', { email: true, sms: false, push: true })
-  );
+  const { prefs: notifPrefs, setPrefs: setNotifPrefs } = useNotificationPreferences();
+  const [browserPermission, setBrowserPermission] = useState(getBrowserNotificationPermission());
 
-  const updateNotifPref = (key: 'email' | 'sms' | 'push') => {
-    setNotifPrefs(prev => {
-      const next = { ...prev, [key]: !prev[key] };
-      savePref('war_room_notif_prefs', next);
-      return next;
-    });
+  const updateNotifPref = async (key: 'email' | 'sms' | 'push') => {
+    const labels = {
+      email: 'Email Alerts',
+      sms:   'SMS Alerts',
+      push:  'Browser',
+    };
+    const previousValue = notifPrefs[key];
+    const nextValue = !previousValue;
+
+    if (key === 'push' && nextValue) {
+      const permission = await requestBrowserNotificationPermission();
+      setBrowserPermission(permission);
+
+      if (permission !== 'granted') {
+        toast.error('Browser notifications are blocked', {
+          description: permission === 'denied'
+            ? 'Allow this site in your browser settings, then enable Browser again.'
+            : 'Browser permission is required before this channel can be enabled.',
+        });
+        return;
+      }
+    }
+
+    setNotifPrefs((prev) => ({ ...prev, [key]: nextValue }));
+
+    if (key === 'push' && nextValue) {
+      showBrowserNotification('Browser notifications enabled', {
+        body: 'New bid alerts will now appear in this browser.',
+        tag: 'alerts-browser-enabled',
+      });
+    }
+
+    toast(
+      <span>{bold(labels[key])} has been {stateText(nextValue ? 'Enabled' : 'Disabled')}</span>,
+      {
+      className: nextValue ? 'appToastToggleOn' : 'appToastToggleOff',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setNotifPrefs((prev) => ({ ...prev, [key]: previousValue }));
+        },
+      },
+      },
+    );
   };
 
   // ── Real data hooks ───────────────────────────────────────
@@ -427,6 +509,53 @@ export default function AlertsPage() {
   const deleteAlert       = useDeleteAlert();
   const deleteSavedSearch = useDeleteSavedSearch();
   const toggleSavedSearch = useToggleSavedSearch();
+
+  const handleToggleSavedSearch = async (searchItem: SavedSearchItem) => {
+    const nextEnabled = !searchItem.notifications;
+    const toastId = toast.loading(
+      <span>{stateText(nextEnabled ? 'Enabling' : 'Muting')} {bold(`${searchItem.name}`)}</span>,
+      {className: nextEnabled ? 'appToastToggleOn' : 'appToastToggleOff',}
+    );
+    try {
+      await toggleSavedSearch.mutateAsync(searchItem.id);
+
+      toast.dismiss(toastId);
+      toast.success(<span>{bold(`${searchItem.name}`)} has been {stateText(nextEnabled ? 'Enabled' : 'Muted')}</span>, {
+        className: nextEnabled ? 'appToastToggleOn' : 'appToastToggleOff',
+        action: {
+          label: 'Undo',
+          onClick: () => toggleSavedSearch.mutate(searchItem.id),
+        },
+      });
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error(<span>{stateText(`${searchItem.name}`)} could not be updated</span>, {
+         className: 'appToastToggleOff',
+         description: "(" + getToastErrorMessage(error) + ")",
+      });
+    }
+  };
+
+  const handleDeleteSavedSearch = async (searchItem: SavedSearchItem) => {
+    const toastId = toast.loading(<span>{stateText("Deleting")} {bold(`${searchItem.name}`)}...</span>,
+    {className: 'appToastToggleOff'}
+    );
+
+    try {
+      await deleteSavedSearch.mutateAsync(searchItem.id);
+
+      toast.dismiss(toastId);
+      toast.success(<span>{bold(`${searchItem.name}`)} has been {stateText('Deleted')}
+      </span>,
+      {className: 'appToastToggleOn'}
+      );
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error(<span>{bold(`${searchItem.name}`)} could not be deleted</span>, {
+         description: "(" + getToastErrorMessage(error) + ")",
+      });
+    }
+  };
 
   const alerts   = useMemo(() => alertsData   ?? [], [alertsData]);
   const searches = useMemo(() => searchesData ?? [], [searchesData]);
@@ -723,14 +852,14 @@ export default function AlertsPage() {
                         <div className={styles.ssActions}>
                           <button
                             className={clsx(styles.ssToggle, s.notifications && styles.ssToggleOn)}
-                            onClick={() => toggleSavedSearch.mutate(s.id)}
+                            onClick={() => void handleToggleSavedSearch(s)}
                             title={s.notifications ? 'Disable notifications' : 'Enable notifications'}
                           >
                             <span className={styles.ssToggleThumb} />
                           </button>
                           <button
                             className={styles.ssDeleteBtn}
-                            onClick={() => deleteSavedSearch.mutate(s.id)}
+                            onClick={() => void handleDeleteSavedSearch(s)}
                             title="Delete search"
                           >
                             <X size={11} />
@@ -761,7 +890,8 @@ export default function AlertsPage() {
 
                       <div className={styles.ssMeta}>
                         <span className={clsx(styles.ssNotifBadge, s.notifications ? styles.ssNotifOn : styles.ssNotifOff)}>
-                          {s.notifications ? '🔔 Notifications On' : '🔕 Muted'}
+                          {s.notifications ? <Bell size={12} /> : <BellOff size={12} />}
+                          {s.notifications ? 'Notifications On' : 'Muted'}
                         </span>
                         <span className={styles.ssMatch}>
                           {s.match_count} matches · {s.last_matched ? formatAgo(s.last_matched) : 'Never'}
@@ -784,11 +914,11 @@ export default function AlertsPage() {
             </div>
 
             <div className={styles.notifList}>
-              {([
-                { key: 'email', icon: Mail,         label: 'Email Alerts',       sub: 'Delivered to Your Inbox'    },
-                { key: 'sms',   icon: MessageSquare, label: 'SMS Alerts',         sub: 'Text Message to Your Phone' },
-                { key: 'push',  icon: Smartphone,    label: 'Push Notifications', sub: 'Browser / Mobile Push'      },
-              ] as const).map(channel => (
+                {([
+                  { key: 'email', icon: Mail,         label: 'Email Alerts',       sub: 'Delivered to Your Inbox'    },
+                  { key: 'sms',   icon: MessageSquare, label: 'SMS Alerts',         sub: 'Text Message to Your Phone' },
+                  { key: 'push',  icon: Monitor,       label: 'Browser',            sub: 'Desktop Browser Notifications' },
+                ] as const).map(channel => (
                 <div key={channel.key} className={styles.notifRow}>
                   <div className={styles.notifLeft}>
                     <div className={clsx(
@@ -799,12 +929,16 @@ export default function AlertsPage() {
                     </div>
                     <div>
                       <p className={styles.notifLabel}>{channel.label}</p>
-                      <p className={styles.notifSub}>{channel.sub}</p>
+                      <p className={styles.notifSub}>
+                        {channel.key === 'push'
+                          ? `${channel.sub} · ${browserPermission}`
+                          : channel.sub}
+                      </p>
                     </div>
                   </div>
                   <button
                     className={clsx(styles.toggle, notifPrefs[channel.key] && styles.toggleOn)}
-                    onClick={() => updateNotifPref(channel.key)}
+                    onClick={() => void updateNotifPref(channel.key)}
                   >
                     <span className={styles.toggleThumb} />
                   </button>
@@ -823,7 +957,9 @@ export default function AlertsPage() {
       </div>
 
       {/* Modal — portal to document.body so position:fixed anchors to viewport */}
-      {showModal && <CreateAlertModal onClose={() => setShowModal(false)} />}
+      <AnimatePresence>
+        {showModal && <CreateAlertModal onClose={() => setShowModal(false)} />}
+      </AnimatePresence>
 
     </div>
   );

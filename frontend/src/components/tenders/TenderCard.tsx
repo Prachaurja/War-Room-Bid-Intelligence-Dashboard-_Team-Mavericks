@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Building2, MapPin, DollarSign, Calendar, ExternalLink, FileText } from 'lucide-react';
 import type { Tender } from '../../types/tender.types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { sectorLabel, sectorColor } from '../../utils/tender.utils';
+import { normalizeTenderStatus, sectorLabel, sectorColor } from '../../utils/tender.utils';
 import styles from './TenderCard.module.css';
 import clsx from 'clsx';
 
@@ -13,6 +13,8 @@ interface TenderCardProps {
 }
 
 export default function TenderCard({ tender, index, onSelect }: TenderCardProps) {
+  const status = normalizeTenderStatus(tender.status);
+
   return (
     <motion.div
       className={styles.card}
@@ -39,8 +41,8 @@ export default function TenderCard({ tender, index, onSelect }: TenderCardProps)
                 {sectorLabel(tender.sector)}
               </span>
             )}
-            <span className={clsx(styles.statusBadge, styles[`status_${tender.status}`])}>
-              {tender.status}
+            <span className={clsx(styles.statusBadge, styles[`status_${status}`])}>
+              {status}
             </span>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { useUIStore } from '../../store/ui.store';
+import { useBrowserAlertNotifications } from '../../hooks/useBrowserAlertNotifications';
 import Sidebar from './SideBar'; 
 import TopBar from './TopBar'; 
 import styles from './AppShell.module.css';
@@ -7,6 +8,7 @@ import styles from './AppShell.module.css';
 export default function AppShell() {
   const { sidebarOpen } = useUIStore();
   const location = useLocation();
+  useBrowserAlertNotifications();
 
   return (
     <div className={styles.shell}>
