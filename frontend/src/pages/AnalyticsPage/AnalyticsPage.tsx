@@ -247,10 +247,10 @@ export default function AnalyticsPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={stateChartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+              <BarChart data={stateChartData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="state" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={38} />
+                <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
                 <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                 <Bar
                   dataKey={activeMetric === 'count' ? 'count' : 'total_value'}
