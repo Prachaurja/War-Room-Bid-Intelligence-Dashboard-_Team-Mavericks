@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import styles from './TenderFilters.module.css';
 
@@ -157,63 +158,76 @@ export default function TenderFilters({
         </div>
       </div>
 
-      {filtersOpen && (
-        <div className={styles.menuPanel}>
-          <div className={styles.controls}>
-            <select
-              className={styles.select}
-              value={sector}
-              onChange={(event) => onSector(event.target.value)}
+      <AnimatePresence initial={false}>
+        {filtersOpen && (
+          <motion.div
+            className={styles.menuPanel}
+            initial={{ maxHeight: 0, opacity: 0, scaleY: 0.96, y: -4 }}
+            animate={{ maxHeight: 140, opacity: 1, scaleY: 1, y: 0 }}
+            exit={{ maxHeight: 0, opacity: 0, scaleY: 0.98, y: -4 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+          >
+            <motion.div
+              className={styles.controls}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
             >
-              {SECTORS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+              <select
+                className={styles.select}
+                value={sector}
+                onChange={(event) => onSector(event.target.value)}
+              >
+                {SECTORS.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
 
-            <select
-              className={styles.select}
-              value={state}
-              onChange={(event) => onState(event.target.value)}
-            >
-              {STATES.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+              <select
+                className={styles.select}
+                value={state}
+                onChange={(event) => onState(event.target.value)}
+              >
+                {STATES.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
 
-            <select
-              className={styles.select}
-              value={yearMode}
-              onChange={(event) => onYearMode(event.target.value as YearMode)}
-            >
-              <option value="close">Close Year</option>
-              <option value="published">Published Year</option>
-            </select>
+              <select
+                className={styles.select}
+                value={yearMode}
+                onChange={(event) => onYearMode(event.target.value as YearMode)}
+              >
+                <option value="close">Close Year</option>
+                <option value="published">Published Year</option>
+              </select>
 
-            <select
-              className={styles.select}
-              value={year}
-              onChange={(event) => onYear(event.target.value)}
-            >
-              <option value="">All Years</option>
-              {yearOptions.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
+              <select
+                className={styles.select}
+                value={year}
+                onChange={(event) => onYear(event.target.value)}
+              >
+                <option value="">All Years</option>
+                {yearOptions.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
 
-            <select
-              className={styles.select}
-              value={sourceName}
-              onChange={(event) => onSource(event.target.value)}
-            >
-              <option value="">All Sources</option>
-              {sourceOptions.map((item) => (
-                <option key={item} value={item}>{sourceLabel(item)}</option>
-              ))}
-            </select>
-
-          </div>
-        </div>
-      )}
+              <select
+                className={styles.select}
+                value={sourceName}
+                onChange={(event) => onSource(event.target.value)}
+              >
+                <option value="">All Sources</option>
+                {sourceOptions.map((item) => (
+                  <option key={item} value={item}>{sourceLabel(item)}</option>
+                ))}
+              </select>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
