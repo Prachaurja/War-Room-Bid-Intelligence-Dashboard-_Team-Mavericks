@@ -141,16 +141,23 @@
 }
 
 .avatar {
-  width: 88px; height: 88px;
-  border-radius: 24px;
-  background: var(--grad-purple);
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: transparent;
   color: #fff;
   display: flex; align-items: center; justify-content: center;
   font-size: 28px; font-weight: 800;
   overflow: hidden;
-  box-shadow: 0 8px 28px var(--accent-glow);
+  box-shadow: none;
 }
-.avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 .avatarBtn {
   width: 100%;

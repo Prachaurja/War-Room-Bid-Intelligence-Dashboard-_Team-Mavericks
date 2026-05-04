@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+﻿import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import {
@@ -53,7 +53,7 @@ export default function Sidebar() {
     .toUpperCase()
     .slice(0, 2) ?? 'WR';
 
-  // CHANGE: read avatar scoped to current user's ID — prevents cross-user contamination
+  // Read avatar scoped to current user's ID to prevent cross-user contamination.
   const avatarKey = `wr_avatar_${user?.id ?? 'default'}`;
   const avatarSrc = user?.avatar ?? localStorage.getItem(avatarKey) ?? '';
 
@@ -280,13 +280,13 @@ export default function Sidebar() {
 
           <div className={styles.divider} />
 
-          {/* ── User section with per-user avatar ── */}
+          {/* User section with per-user avatar */}
           <div className={styles.userSection}>
             <div className={styles.avatar}>
               {avatarSrc
                 ? <img
                     src={avatarSrc}
-                    alt="avatar"
+                    alt={`${user?.name ?? 'User'} avatar`}
                     style={{
                       width: '100%', height: '100%',
                       objectFit: 'cover',
@@ -309,3 +309,4 @@ export default function Sidebar() {
     </AnimatePresence>
   );
 }
+
