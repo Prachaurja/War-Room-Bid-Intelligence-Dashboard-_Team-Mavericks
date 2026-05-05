@@ -20,15 +20,13 @@ type SystemPanelKey = 'sources' | null;
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
-  const {
-    sidebarOpen,
-  } = useUIStore();
-  const location    = useLocation();
-  const navigate    = useNavigate();
-  const queryClient = useQueryClient();
+  const { sidebarOpen }  = useUIStore();
+  const location         = useLocation();
+  const navigate         = useNavigate();
+  const queryClient      = useQueryClient();
   const { status, newTenders, newAlerts, clearCounters } = useWebSocket();
   const { data: alertsData } = useAlerts();
-  const { data: stats } = useOverviewStats();
+  const { data: stats }      = useOverviewStats();
   const [systemPanel, setSystemPanel] = useState<SystemPanelKey>(null);
 
   const unreadCount = (alertsData ?? []).filter((a) => !a.read).length;
@@ -39,13 +37,13 @@ export default function Sidebar() {
   const hasNewData   = newTenders > 0;
 
   const NAV_ITEMS = [
-    { label: 'Home',       path: '/home',       icon: Home,            badge: null },
-    { label: 'Overview',   path: '/',           icon: LayoutDashboard, badge: null },
-    { label: 'Tenders',    path: '/tenders',    icon: Gavel,           badge: null },
-    { label: 'Analytics',  path: '/analytics',  icon: BarChart3,       badge: null },
-    { label: 'Reports',    path: '/reports',    icon: FileText,        badge: null },
-    { label: 'Alerts',     path: '/alerts',     icon: Bell,            badge: totalBadge > 0 ? String(totalBadge) : null },
-    { label: 'Data Sources', path: '/data-sources', icon: HardDrive,  badge: null },
+    { label: 'Home',         path: '/home',         icon: Home,            badge: null },
+    { label: 'Overview',     path: '/',              icon: LayoutDashboard, badge: null },
+    { label: 'Tenders',      path: '/tenders',       icon: Gavel,           badge: null },
+    { label: 'Analytics',    path: '/analytics',     icon: BarChart3,       badge: null },
+    { label: 'Reports',      path: '/reports',       icon: FileText,        badge: null },
+    { label: 'Alerts',       path: '/alerts',        icon: Bell,            badge: totalBadge > 0 ? String(totalBadge) : null },
+    { label: 'Data Sources', path: '/data-sources',  icon: HardDrive,       badge: null },
   ];
 
   const initials = user?.name
@@ -54,6 +52,10 @@ export default function Sidebar() {
     .join('')
     .toUpperCase()
     .slice(0, 2) ?? 'WR';
+
+  // CHANGE: read avatar scoped to current user's ID — prevents cross-user contamination
+  const avatarKey = `wr_avatar_${user?.id ?? 'default'}`;
+  const avatarSrc = user?.avatar ?? localStorage.getItem(avatarKey) ?? '';
 
   const systemButtons = [
     { key: 'sources', label: 'Data Sources', icon: Database },
@@ -262,9 +264,7 @@ export default function Sidebar() {
               >
                 <div className={styles.systemPanelHeader}>
                   <div>
-                    <p className={styles.systemPanelTitle}>
-                      Data Sources
-                    </p>
+                    <p className={styles.systemPanelTitle}>Data Sources</p>
                     <p className={styles.systemPanelSub}>
                       Active feeds, source coverage, and connectivity status
                     </p>
@@ -280,8 +280,21 @@ export default function Sidebar() {
 
           <div className={styles.divider} />
 
+          {/* ── User section with per-user avatar ── */}
           <div className={styles.userSection}>
-            <div className={styles.avatar}>{initials}</div>
+            <div className={styles.avatar}>
+              {avatarSrc
+                ? <img
+                    src={avatarSrc}
+                    alt="avatar"
+                    style={{
+                      width: '100%', height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: 'inherit',
+                    }}
+                  />
+                : initials}
+            </div>
             <div className={styles.userInfo}>
               <p className={styles.userName}>{user?.name ?? 'Analyst'}</p>
               <p className={styles.userRole}>{user?.role ?? 'admin'}</p>
@@ -290,6 +303,7 @@ export default function Sidebar() {
               <LogOut size={15} />
             </button>
           </div>
+
         </motion.aside>
       )}
     </AnimatePresence>
