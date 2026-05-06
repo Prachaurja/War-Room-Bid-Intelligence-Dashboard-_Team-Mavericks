@@ -480,3 +480,199 @@
 
 /* ── Empty ── */
 .emptyState { font-size: 13px; color: var(--text-dim); text-align: center; padding: 24px; }
+
+/* ── Phase 3 — shared card header row ── */
+.cardHeaderRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cardSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.cardSectionSub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+/* ── Phase 3 — 2FA setup ── */
+.totpSetup { display: flex; flex-direction: column; gap: 14px; }
+.totpDivider { height: 1px; background: var(--border); margin: 4px 0; }
+.totpInstruction { font-size: 13px; color: var(--text-secondary); }
+.totpQrWrap {
+  display: flex; justify-content: center;
+  padding: 16px; background: #fff; border-radius: var(--radius-lg);
+  width: fit-content;
+}
+.totpQr { width: 180px; height: 180px; display: block; }
+.totpSecretWrap {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.totpSecretLabel { font-size: 11.5px; color: var(--text-dim); flex-shrink: 0; }
+.totpSecret {
+  font-size: 13px; font-family: monospace;
+  color: var(--accent-lighter); flex: 1;
+  word-break: break-all;
+}
+.totpCopyBtn {
+  color: var(--text-dim); background: none; border: none;
+  cursor: pointer; padding: 4px;
+  transition: color 0.15s; flex-shrink: 0;
+}
+.totpCopyBtn:hover { color: var(--accent-lighter); }
+.totpVerifyRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ── Phase 3 — sessions ── */
+.sessionList { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.sessionRow {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.sessionIcon {
+  width: 36px; height: 36px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.sessionInfo { flex: 1; min-width: 0; }
+.sessionAgent {
+  font-size: 12.5px; font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sessionMeta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.currentBadge {
+  display: inline-block; margin-left: 6px;
+  padding: 1px 7px; border-radius: var(--radius-full);
+  font-size: 10px; font-weight: 600;
+  background: rgba(16,185,129,0.15); color: #34D399;
+  border: 1px solid rgba(16,185,129,0.3);
+}
+.sessionRevokeBtn {
+  color: var(--text-dim); background: none; border: none;
+  cursor: pointer; padding: 4px; transition: color 0.15s; flex-shrink: 0;
+}
+.sessionRevokeBtn:hover { color: #EF4444; }
+
+/* ── Phase 3 — invitations ── */
+.inviteRow { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.invitationList { display: flex; flex-direction: column; gap: 8px; }
+.invitationRow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.invitationInfo { flex: 1; min-width: 0; }
+.invitationEmail { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.invitationMeta  { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.inviteStatusBadge {
+  padding: 2px 9px; border-radius: var(--radius-full);
+  font-size: 11px; font-weight: 600; flex-shrink: 0;
+  background: var(--bg-overlay); color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.inviteStatus_pending  { background: rgba(245,158,11,0.12); color: #F59E0B; border-color: rgba(245,158,11,0.3); }
+.inviteStatus_accepted { background: rgba(16,185,129,0.12); color: #10B981; border-color: rgba(16,185,129,0.3); }
+.inviteStatus_revoked  { background: rgba(239,68,68,0.1);   color: #EF4444; border-color: rgba(239,68,68,0.25); }
+.inviteStatus_expired  { background: var(--bg-overlay);     color: var(--text-dim); }
+
+/* ── Phase 3 — API keys ── */
+.createdKeyBanner {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 14px; margin-bottom: 14px;
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: var(--radius-md);
+}
+.createdKeyTitle { font-size: 12px; font-weight: 600; color: #F59E0B; margin-bottom: 5px; }
+.createdKeyValue {
+  font-size: 11.5px; font-family: monospace;
+  color: var(--text-primary); word-break: break-all;
+}
+.apiKeyList { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.apiKeyRow {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.apiKeyIcon {
+  width: 34px; height: 34px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(124,58,237,0.12); color: #7C3AED; flex-shrink: 0;
+}
+.apiKeyInfo { flex: 1; min-width: 0; }
+.apiKeyName { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.apiKeyMeta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+
+.recoveryCodesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+ 
+.recoveryCodeItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+ 
+.recoveryCode {
+  font-size: 13px;
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--accent-lighter);
+  letter-spacing: 0.05em;
+}
+ 
+.copyAllBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-lighter);
+  background: var(--accent-dim);
+  border: 1px solid var(--border-accent);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-bottom: 14px;
+}
+.copyAllBtn:hover { opacity: 0.8; }
+ 
+.savedConfirmRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.savedConfirmRow input[type="checkbox"] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
