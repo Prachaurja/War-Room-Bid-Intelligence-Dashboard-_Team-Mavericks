@@ -34,7 +34,6 @@ const INVITE_STATUS_CLASS: Record<string, string> = {
   expired:  styles.inviteStatus_expired,
 };
 
-// ── Section config ────────────────────────────────────────────
 const SECTIONS = [
   { id: 'profile',      label: 'Profile',            icon: User,              group: 'Account'     },
   { id: 'password',     label: 'Password',            icon: Lock,              group: 'Account'     },
@@ -128,6 +127,91 @@ interface InvitationItem {
   id: string; email: string; role: string; status: string; expires_at: string;
 }
 
+// ── Password Verify Modal ─────────────────────────────────────
+interface PasswordModalProps {
+  onConfirm: (password: string) => Promise<void>;
+  onCancel:  () => void;
+  loading:   boolean;
+  error:     string;
+}
+
+function PasswordVerifyModal({ onConfirm, onCancel, loading, error }: PasswordModalProps) {
+  const [pw,      setPw]      = useState('');
+  const [showPw,  setShowPw]  = useState(false);
+  const inputRef              = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 80);
+  }, []);
+
+  return (
+    <div className={styles.modalBackdrop} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+      <motion.div
+        className={styles.modalCard}
+        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        animate={{ opacity: 1, scale: 1,    y: 0  }}
+        exit={{    opacity: 0, scale: 0.95, y: 12 }}
+        transition={{ duration: 0.18 }}
+      >
+        <div className={styles.modalHeader}>
+          <div className={styles.modalIconWrap}>
+            <KeyRound size={20} />
+          </div>
+          <div>
+            <h3 className={styles.modalTitle}>Verify Your Password</h3>
+            <p className={styles.modalSub}>Enter Your Password to View Recovery Codes</p>
+          </div>
+          <button className={styles.modalClose} onClick={onCancel}><XCircle size={18} /></button>
+        </div>
+
+        <div className={styles.modalBody}>
+          <div className={styles.field}>
+            <label className={styles.label}>Current Password</label>
+            <div className={styles.inputWrap}>
+              <Lock size={14} className={styles.inputIcon} />
+              <input
+                ref={inputRef}
+                className={styles.input}
+                type={showPw ? 'text' : 'password'}
+                placeholder="Enter your password"
+                value={pw}
+                onChange={e => setPw(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && pw && onConfirm(pw)}
+                disabled={loading}
+              />
+              <button className={styles.inputToggle} type="button" onClick={() => setShowPw(v => !v)}>
+                {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+            {error && (
+              <motion.p
+                className={styles.modalError}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {error}
+              </motion.p>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.modalFooter}>
+          <button className={styles.ghostBtn} onClick={onCancel} disabled={loading}>Cancel</button>
+          <button
+            className={styles.primaryBtn}
+            onClick={() => onConfirm(pw)}
+            disabled={loading || !pw}
+          >
+            {loading
+              ? <><RefreshCw size={13} className={styles.spinning} /> Verifying…</>
+              : <><Eye size={13} /> View Codes</>}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { user }                    = useAuth();
@@ -174,10 +258,17 @@ export default function SettingsPage() {
     setProfileSaving(true);
     try {
       await apiClient.patch('/auth/me', { name: profileName.trim() });
-      updateUser({ name: profileName.trim(), avatar: avatarSrc || undefined });
+      // PATCH succeeded — update local store separately so a localStorage
+      // quota error (e.g. large base64 avatar) never causes a false failure toast
+      try {
+        updateUser({ name: profileName.trim(), avatar: avatarSrc || undefined });
+      } catch {
+        // Store update failed (e.g. localStorage quota) — not critical, ignore silently
+      }
       originalName.current = profileName.trim();
       toast.success('Profile Updated Successfully');
     } catch (err) {
+      console.error('Profile save error:', err);
       toast.error(axiosErrorDetail(err) ?? 'Failed to Update Profile');
     } finally {
       setProfileSaving(false);
@@ -288,7 +379,7 @@ export default function SettingsPage() {
   };
 
   // ════════════════════════════════════════════════════════════
-  // PHASE 3 — 2FA + RECOVERY CODES STATE
+  // PHASE 3 — 2FA + RECOVERY CODES
   // ════════════════════════════════════════════════════════════
   const [totpEnabled,       setTotpEnabled]      = useState(false);
   const [totpQr,            setTotpQr]           = useState<string | null>(null);
@@ -296,14 +387,19 @@ export default function SettingsPage() {
   const [totpCode,          setTotpCode]         = useState('');
   const [totpLoading,       setTotpLoading]      = useState(false);
   const [totpSetupMode,     setTotpSetupMode]    = useState(false);
-  // ── Recovery codes state ──────────────────────────────────
   const [recoveryCodes,     setRecoveryCodes]    = useState<string[]>([]);
   const [showRecoveryCodes, setShowRecoveryCodes]= useState(false);
   const [remainingCodes,    setRemainingCodes]   = useState(0);
   const [regenLoading,      setRegenLoading]     = useState(false);
   const [savedConfirmed,    setSavedConfirmed]   = useState(false);
 
-  // Load 2FA status + remaining recovery code count
+  // ── Password modal for viewing recovery codes ─────────────
+  const [showPwModal,    setShowPwModal]    = useState(false);
+  const [pwModalLoading, setPwModalLoading] = useState(false);
+  const [pwModalError,   setPwModalError]   = useState('');
+  // Whether the modal was triggered for "view" vs "regenerate"
+  const [pwModalIntent, setPwModalIntent]   = useState<'view' | 'regen'>('view');
+
   const load2faStatus = useCallback(async () => {
     try {
       const res = await apiClient.get('/auth/totp/status');
@@ -313,10 +409,14 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (activeSection === 'security') load2faStatus();
+    if (activeSection === 'security') {
+      // Reset visibility whenever user navigates to security section
+      setShowRecoveryCodes(false);
+      setSavedConfirmed(false);
+      load2faStatus();
+    }
   }, [activeSection, load2faStatus]);
 
-  // Start 2FA setup — also captures recovery codes
   const handle2faSetup = async () => {
     setTotpLoading(true);
     try {
@@ -334,7 +434,6 @@ export default function SettingsPage() {
     }
   };
 
-  // Verify TOTP code — shows recovery codes after success
   const handle2faVerify = async () => {
     if (totpCode.length !== 6) return toast.error('Enter the 6-digit code from your authenticator app');
     setTotpLoading(true);
@@ -346,8 +445,10 @@ export default function SettingsPage() {
       setTotpQr(null);
       setTotpSecret(null);
       setTotpCode('');
-      setShowRecoveryCodes(true); // show recovery codes immediately after enabling
-      toast.success('2FA Enabled Successfully');
+      // After first-time setup, show codes immediately (no password needed — user just set their password moments ago)
+      setShowRecoveryCodes(true);
+      setSavedConfirmed(false);
+      toast.success('2FA Enabled Successfully — save your recovery codes below');
     } catch (err) {
       toast.error(axiosErrorDetail(err) ?? 'Invalid code. Please try again.');
     } finally {
@@ -363,16 +464,83 @@ export default function SettingsPage() {
       setRecoveryCodes([]);
       setShowRecoveryCodes(false);
       setRemainingCodes(0);
+      setSavedConfirmed(false);
       toast.success('2FA Disabled');
     } catch (err) {
-      toast.error(axiosErrorDetail(err) ?? 'Failed to disable 2FA');
+      toast.error(axiosErrorDetail(err) ?? 'Failed to Disable 2FA');
     } finally {
       setTotpLoading(false);
     }
   };
 
-  // Regenerate a fresh set of recovery codes
-  const handleRegenerateCodes = async () => {
+  // ── Password modal handlers ───────────────────────────────
+  const openViewModal = () => {
+    setPwModalIntent('view');
+    setPwModalError('');
+    setShowPwModal(true);
+  };
+
+  const openRegenModal = () => {
+    setPwModalIntent('regen');
+    setPwModalError('');
+    setShowPwModal(true);
+  };
+
+  const handlePasswordModalConfirm = async (password: string) => {
+    setPwModalLoading(true);
+    setPwModalError('');
+    try {
+      // Verify password by calling change-password with same password — we use a dedicated verify endpoint
+      // Since we don't have a standalone verify endpoint, we call /auth/me after setting Authorization
+      // and attempt a dry-run via change-password with current=new (backend rejects with 422, not 401)
+      // Better: just POST to login with current credentials to confirm identity
+      const formData = new URLSearchParams();
+      formData.append('username', user?.email ?? '');
+      formData.append('password', password);
+
+      const res = await fetch(
+        `${(import.meta.env.VITE_API_URL ?? 'http://localhost:8000')}/auth/login`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body:    formData.toString(),
+        }
+      );
+
+      if (!res.ok) {
+        setPwModalError('Incorrect password. Please try again.');
+        setPwModalLoading(false);
+        return;
+      }
+
+      // Password confirmed — now perform the intended action
+      setShowPwModal(false);
+
+      if (pwModalIntent === 'view') {
+        // Fetch fresh codes from the API
+        const codesRes = await apiClient.get('/auth/totp/status');
+        setRemainingCodes(codesRes.data.remaining_recovery_codes ?? 0);
+        // We don't store plain codes server-side after initial generation
+        // So if recoveryCodes is empty (returning user), show the low-count warning instead
+        if (recoveryCodes.length > 0) {
+          setShowRecoveryCodes(true);
+        } else {
+          // No codes in memory — user needs to regenerate to see them
+          toast.info('Recovery codes are not stored after initial setup. Click Regenerate to get a new set.');
+        }
+      } else {
+        // Regenerate
+        await doRegenerate();
+      }
+
+    } catch {
+      setPwModalError('Could not verify password. Check your connection.');
+    } finally {
+      setPwModalLoading(false);
+    }
+  };
+
+  const doRegenerate = async () => {
     setRegenLoading(true);
     try {
       const res = await apiClient.post('/auth/totp/recovery-codes/regenerate');
@@ -380,16 +548,16 @@ export default function SettingsPage() {
       setRemainingCodes(res.data.recovery_codes.length);
       setShowRecoveryCodes(true);
       setSavedConfirmed(false);
-      toast.success('New recovery codes generated — save them now');
+      toast.success('New Recovery Codes Generated — Save Them Now');
     } catch (err) {
-      toast.error(axiosErrorDetail(err) ?? 'Failed to regenerate recovery codes');
+      toast.error(axiosErrorDetail(err) ?? 'Failed to Regenerate Recovery Codes');
     } finally {
       setRegenLoading(false);
     }
   };
 
   // ════════════════════════════════════════════════════════════
-  // PHASE 3 — SESSIONS STATE
+  // SESSIONS
   // ════════════════════════════════════════════════════════════
   const [sessions,        setSessions]       = useState<SessionItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -428,7 +596,7 @@ export default function SettingsPage() {
   };
 
   // ════════════════════════════════════════════════════════════
-  // PHASE 3 — API KEYS STATE
+  // API KEYS
   // ════════════════════════════════════════════════════════════
   const [apiKeys,        setApiKeys]       = useState<ApiKeyItem[]>([]);
   const [apiKeysLoading, setApiKeysLoading] = useState(false);
@@ -455,7 +623,7 @@ export default function SettingsPage() {
       setCreatedKey(res.data.key);
       setNewKeyName('');
       await loadApiKeys();
-      toast.success("API Key Created — copy it now, it won't be shown again");
+      toast.success("API Key Created — Copy It Now, It Won't Be Shown Again");
     } catch (err) {
       toast.error(axiosErrorDetail(err) ?? 'Failed to create API key');
     }
@@ -472,7 +640,7 @@ export default function SettingsPage() {
   };
 
   // ════════════════════════════════════════════════════════════
-  // PHASE 3 — TEAM / INVITATIONS STATE
+  // TEAMS
   // ════════════════════════════════════════════════════════════
   const [teams,        setTeams]       = useState<TeamItem[]>([]);
   const [selectedTeam, setSelectedTeam]= useState<TeamItem | null>(null);
@@ -544,6 +712,18 @@ export default function SettingsPage() {
   return (
     <div className={`${styles.page} page-enter`}>
 
+      {/* ── Password Verify Modal ── */}
+      <AnimatePresence>
+        {showPwModal && (
+          <PasswordVerifyModal
+            onConfirm={handlePasswordModalConfirm}
+            onCancel={() => { setShowPwModal(false); setPwModalError(''); }}
+            loading={pwModalLoading}
+            error={pwModalError}
+          />
+        )}
+      </AnimatePresence>
+
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.heading}>Settings</h2>
@@ -590,39 +770,20 @@ export default function SettingsPage() {
                 <>
                   <div className={styles.sectionHeader}>
                     <User size={18} className={styles.sectionIcon} />
-                    <div>
-                      <h3 className={styles.sectionTitle}>Profile</h3>
-                      <p className={styles.sectionSub}>Edit the Profile Shown Across the Dashboard</p>
-                    </div>
+                    <div><h3 className={styles.sectionTitle}>Profile</h3><p className={styles.sectionSub}>Edit the Profile Shown Across the Dashboard</p></div>
                   </div>
                   <div className={styles.card}>
                     <div className={styles.profileLayout}>
                       <div className={styles.avatarColumn}>
-                        <div className={styles.avatar}>
-                          {avatarSrc ? <img src={avatarSrc} alt="avatar" /> : initials}
-                        </div>
-                        <button className={styles.avatarBtn} onClick={() => avatarRef.current?.click()}>
-                          <Camera size={13} /> Change Avatar
-                        </button>
+                        <div className={styles.avatar}>{avatarSrc ? <img src={avatarSrc} alt="avatar" /> : initials}</div>
+                        <button className={styles.avatarBtn} onClick={() => avatarRef.current?.click()}><Camera size={13} /> Change Avatar</button>
                         <input ref={avatarRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
                       </div>
                       <div>
                         <div className={styles.formGrid}>
-                          <div className={styles.field}>
-                            <label className={styles.label}>Full Name</label>
-                            <input className={styles.input} value={profileName}
-                              onChange={e => setProfileName(e.target.value)} placeholder="Your full name" />
-                          </div>
-                          <div className={styles.field}>
-                            <label className={styles.label}>Login Email</label>
-                            <input className={`${styles.input} ${styles.inputReadonly}`} value={user?.email ?? ''} readOnly />
-                            <p className={styles.helpText}>Email cannot be changed here</p>
-                          </div>
-                          <div className={`${styles.field} ${styles.fieldFull}`}>
-                            <label className={styles.label}>Role</label>
-                            <input className={`${styles.input} ${styles.inputReadonly}`} value={user?.role ?? ''} readOnly />
-                            <p className={styles.helpText}>Role is managed by your administrator</p>
-                          </div>
+                          <div className={styles.field}><label className={styles.label}>Full Name</label><input className={styles.input} value={profileName} onChange={e => setProfileName(e.target.value)} placeholder="Your full name" /></div>
+                          <div className={styles.field}><label className={styles.label}>Login Email</label><input className={`${styles.input} ${styles.inputReadonly}`} value={user?.email ?? ''} readOnly /><p className={styles.helpText}>Email cannot be changed here</p></div>
+                          <div className={`${styles.field} ${styles.fieldFull}`}><label className={styles.label}>Role</label><input className={`${styles.input} ${styles.inputReadonly}`} value={user?.role ?? ''} readOnly /><p className={styles.helpText}>Role is managed by your administrator</p></div>
                         </div>
                         <div className={styles.actionRow}>
                           <button className={styles.ghostBtn} onClick={() => setProfileName(originalName.current)}>Reset</button>
@@ -630,10 +791,7 @@ export default function SettingsPage() {
                             {profileSaving ? <><RefreshCw size={13} className={styles.spinning} /> Saving…</> : <><Check size={13} /> Save Profile</>}
                           </button>
                         </div>
-                        <div className={styles.metaLine}>
-                          <span className={styles.metaBadge}>Role: {user?.role ?? 'analyst'}</span>
-                          <span>Signed in as {user?.email ?? 'unknown'}</span>
-                        </div>
+                        <div className={styles.metaLine}><span className={styles.metaBadge}>Role: {user?.role ?? 'analyst'}</span><span>Signed in as {user?.email ?? 'unknown'}</span></div>
                       </div>
                     </div>
                   </div>
@@ -643,55 +801,19 @@ export default function SettingsPage() {
               {/* ════ 2. PASSWORD ════ */}
               {activeSection === 'password' && (
                 <>
-                  <div className={styles.sectionHeader}>
-                    <Lock size={18} className={styles.sectionIcon} />
-                    <div>
-                      <h3 className={styles.sectionTitle}>Password</h3>
-                      <p className={styles.sectionSub}>Update Your Account Password</p>
-                    </div>
-                  </div>
+                  <div className={styles.sectionHeader}><Lock size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Password</h3><p className={styles.sectionSub}>Update Your Account Password</p></div></div>
                   <div className={styles.card}>
                     <div className={styles.formGrid}>
                       <div className={`${styles.field} ${styles.fieldFull}`}>
                         <label className={styles.label}>Current Password</label>
-                        <div className={styles.inputWrap}>
-                          <input className={styles.input} type={showPw.current ? 'text' : 'password'}
-                            value={pwCurrent} onChange={e => setPwCurrent(e.target.value)} placeholder="Enter current password" />
-                          <button className={styles.inputToggle} type="button" onClick={() => setShowPw(p => ({ ...p, current: !p.current }))}>
-                            {showPw.current ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
-                        </div>
+                        <div className={styles.inputWrap}><input className={styles.input} type={showPw.current ? 'text' : 'password'} value={pwCurrent} onChange={e => setPwCurrent(e.target.value)} placeholder="Enter current password" /><button className={styles.inputToggle} type="button" onClick={() => setShowPw(p => ({ ...p, current: !p.current }))}>{showPw.current ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
                       </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>New Password</label>
-                        <div className={styles.inputWrap}>
-                          <input className={styles.input} type={showPw.new ? 'text' : 'password'}
-                            value={pwNew} onChange={e => setPwNew(e.target.value)} placeholder="At least 8 characters" />
-                          <button className={styles.inputToggle} type="button" onClick={() => setShowPw(p => ({ ...p, new: !p.new }))}>
-                            {showPw.new ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
-                        </div>
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Confirm Password</label>
-                        <div className={styles.inputWrap}>
-                          <input className={styles.input} type={showPw.confirm ? 'text' : 'password'}
-                            value={pwConfirm} onChange={e => setPwConfirm(e.target.value)} placeholder="Repeat new password" />
-                          <button className={styles.inputToggle} type="button" onClick={() => setShowPw(p => ({ ...p, confirm: !p.confirm }))}>
-                            {showPw.confirm ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
-                        </div>
-                      </div>
+                      <div className={styles.field}><label className={styles.label}>New Password</label><div className={styles.inputWrap}><input className={styles.input} type={showPw.new ? 'text' : 'password'} value={pwNew} onChange={e => setPwNew(e.target.value)} placeholder="At least 8 characters" /><button className={styles.inputToggle} type="button" onClick={() => setShowPw(p => ({ ...p, new: !p.new }))}>{showPw.new ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></div>
+                      <div className={styles.field}><label className={styles.label}>Confirm Password</label><div className={styles.inputWrap}><input className={styles.input} type={showPw.confirm ? 'text' : 'password'} value={pwConfirm} onChange={e => setPwConfirm(e.target.value)} placeholder="Repeat new password" /><button className={styles.inputToggle} type="button" onClick={() => setShowPw(p => ({ ...p, confirm: !p.confirm }))}>{showPw.confirm ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></div>
                     </div>
                     {pwNew.length > 0 && (
                       <div className={styles.strengthWrap}>
-                        <div className={styles.strengthBars}>
-                          {[1,2,3].map(i => (
-                            <div key={i} className={styles.strengthBar} style={{
-                              background: i <= pwStrength ? pwStrength === 1 ? '#EF4444' : pwStrength === 2 ? '#F59E0B' : '#10B981' : 'var(--bg-overlay)',
-                            }} />
-                          ))}
-                        </div>
+                        <div className={styles.strengthBars}>{[1,2,3].map(i => <div key={i} className={styles.strengthBar} style={{ background: i <= pwStrength ? pwStrength === 1 ? '#EF4444' : pwStrength === 2 ? '#F59E0B' : '#10B981' : 'var(--bg-overlay)' }} />)}</div>
                         <span className={styles.strengthLabel}>{pwStrength === 1 ? 'Weak' : pwStrength === 2 ? 'Good' : 'Strong'}</span>
                       </div>
                     )}
@@ -706,70 +828,22 @@ export default function SettingsPage() {
               )}
 
               {/* ════ 3. APPEARANCE ════ */}
-              {activeSection === 'appearance' && (
-                <>
-                  <div className={styles.sectionHeader}>
-                    <Palette size={18} className={styles.sectionIcon} />
-                    <div><h3 className={styles.sectionTitle}>Appearance</h3><p className={styles.sectionSub}>Choose a Theme and Preview it Before Applying</p></div>
-                  </div>
-                  <div className={styles.card}><ThemePreviewSelector selectedTheme={themeMode} onSelect={setThemeMode} /></div>
-                </>
-              )}
+              {activeSection === 'appearance' && (<><div className={styles.sectionHeader}><Palette size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Appearance</h3><p className={styles.sectionSub}>Choose a Theme and Preview it Before Applying</p></div></div><div className={styles.card}><ThemePreviewSelector selectedTheme={themeMode} onSelect={setThemeMode} /></div></>)}
 
               {/* ════ 4. TENDER PREFERENCES ════ */}
               {activeSection === 'tender-prefs' && (
                 <>
-                  <div className={styles.sectionHeader}>
-                    <SlidersHorizontal size={18} className={styles.sectionIcon} />
-                    <div><h3 className={styles.sectionTitle}>Tender Preferences</h3><p className={styles.sectionSub}>Default Filters Applied When Opening the Tenders Page</p></div>
-                  </div>
+                  <div className={styles.sectionHeader}><SlidersHorizontal size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Tender Preferences</h3><p className={styles.sectionSub}>Default Filters Applied When Opening the Tenders Page</p></div></div>
                   <div className={styles.card}>
                     <div className={styles.formGrid}>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Default Sector</label>
-                        <select className={styles.select} value={tenderPrefs.defaultSector} onChange={e => setTenderPrefs(p => ({ ...p, defaultSector: e.target.value }))}>
-                          <option value="">All Sectors</option>
-                          <option value="facility_management">Facility Management</option>
-                          <option value="construction">Construction</option>
-                          <option value="cleaning">Cleaning</option>
-                          <option value="it_services">IT Services</option>
-                          <option value="healthcare">Healthcare</option>
-                          <option value="transportation">Transportation</option>
-                        </select>
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Default State</label>
-                        <select className={styles.select} value={tenderPrefs.defaultState} onChange={e => setTenderPrefs(p => ({ ...p, defaultState: e.target.value }))}>
-                          <option value="">All States</option>
-                          {['NSW','VIC','QLD','WA','SA','TAS','NT','ACT'].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Default Sort</label>
-                        <select className={styles.select} value={tenderPrefs.defaultSort} onChange={e => setTenderPrefs(p => ({ ...p, defaultSort: e.target.value }))}>
-                          <option value="newest">Newest First</option>
-                          <option value="closing">Closing Soon</option>
-                          <option value="value_desc">Highest Value</option>
-                          <option value="value_asc">Lowest Value</option>
-                        </select>
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Default Page Size</label>
-                        <select className={styles.select} value={tenderPrefs.defaultPageSize} onChange={e => setTenderPrefs(p => ({ ...p, defaultPageSize: e.target.value }))}>
-                          {['10','15','25','50'].map(n => <option key={n} value={n}>{n} per page</option>)}
-                        </select>
-                      </div>
-                      <div className={`${styles.field} ${styles.fieldFull}`}>
-                        <label className={styles.label}>Minimum Contract Value</label>
-                        <input className={styles.input} type="number" placeholder="e.g. 100000 — leave empty for all values"
-                          value={tenderPrefs.minValue} onChange={e => setTenderPrefs(p => ({ ...p, minValue: e.target.value }))} />
-                      </div>
+                      <div className={styles.field}><label className={styles.label}>Default Sector</label><select className={styles.select} value={tenderPrefs.defaultSector} onChange={e => setTenderPrefs(p => ({ ...p, defaultSector: e.target.value }))}><option value="">All Sectors</option><option value="facility_management">Facility Management</option><option value="construction">Construction</option><option value="cleaning">Cleaning</option><option value="it_services">IT Services</option><option value="healthcare">Healthcare</option><option value="transportation">Transportation</option></select></div>
+                      <div className={styles.field}><label className={styles.label}>Default State</label><select className={styles.select} value={tenderPrefs.defaultState} onChange={e => setTenderPrefs(p => ({ ...p, defaultState: e.target.value }))}><option value="">All States</option>{['NSW','VIC','QLD','WA','SA','TAS','NT','ACT'].map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                      <div className={styles.field}><label className={styles.label}>Default Sort</label><select className={styles.select} value={tenderPrefs.defaultSort} onChange={e => setTenderPrefs(p => ({ ...p, defaultSort: e.target.value }))}><option value="newest">Newest First</option><option value="closing">Closing Soon</option><option value="value_desc">Highest Value</option><option value="value_asc">Lowest Value</option></select></div>
+                      <div className={styles.field}><label className={styles.label}>Default Page Size</label><select className={styles.select} value={tenderPrefs.defaultPageSize} onChange={e => setTenderPrefs(p => ({ ...p, defaultPageSize: e.target.value }))}>{['10','15','25','50'].map(n => <option key={n} value={n}>{n} per page</option>)}</select></div>
+                      <div className={`${styles.field} ${styles.fieldFull}`}><label className={styles.label}>Minimum Contract Value</label><input className={styles.input} type="number" placeholder="e.g. 100000 — leave empty for all values" value={tenderPrefs.minValue} onChange={e => setTenderPrefs(p => ({ ...p, minValue: e.target.value }))} /></div>
                     </div>
                     <div className={styles.actionRow}>
-                      <button className={styles.ghostBtn} onClick={() => {
-                        const d = { defaultSector:'', defaultState:'', defaultSort:'newest', defaultPageSize:'15', minValue:'' };
-                        setTenderPrefs(d); setPref('wr_tender_prefs', d); toast.success('Reset to Defaults');
-                      }}>Reset</button>
+                      <button className={styles.ghostBtn} onClick={() => { const d = { defaultSector:'', defaultState:'', defaultSort:'newest', defaultPageSize:'15', minValue:'' }; setTenderPrefs(d); setPref('wr_tender_prefs', d); toast.success('Reset to Defaults'); }}>Reset</button>
                       <button className={styles.primaryBtn} onClick={saveTenderPrefs}><Check size={13} /> Save Preferences</button>
                     </div>
                   </div>
@@ -779,10 +853,7 @@ export default function SettingsPage() {
               {/* ════ 5. ALERT PREFERENCES ════ */}
               {activeSection === 'alert-prefs' && (
                 <>
-                  <div className={styles.sectionHeader}>
-                    <Bell size={18} className={styles.sectionIcon} />
-                    <div><h3 className={styles.sectionTitle}>Alert Preferences</h3><p className={styles.sectionSub}>Control How and When Alerts Reach You</p></div>
-                  </div>
+                  <div className={styles.sectionHeader}><Bell size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Alert Preferences</h3><p className={styles.sectionSub}>Control How and When Alerts Reach You</p></div></div>
                   <div className={styles.card}>
                     <p className={styles.cardLabel}>Notification Channels</p>
                     <div className={styles.channelList}>
@@ -790,16 +861,8 @@ export default function SettingsPage() {
                         const Icon = CHANNEL_CONFIG[key].icon;
                         return (
                           <div key={key} className={styles.channelRow}>
-                            <div className={styles.channelLeft}>
-                              <div className={styles.channelIcon}><Icon size={16} /></div>
-                              <div>
-                                <p className={styles.channelLabel}>{CHANNEL_CONFIG[key].label}</p>
-                                <p className={styles.channelSub}>{CHANNEL_CONFIG[key].sub}</p>
-                              </div>
-                            </div>
-                            <button className={`${styles.toggle} ${prefs[key] ? styles.toggleOn : ''}`} onClick={() => void updateChannel(key)}>
-                              <span className={styles.toggleThumb} />
-                            </button>
+                            <div className={styles.channelLeft}><div className={styles.channelIcon}><Icon size={16} /></div><div><p className={styles.channelLabel}>{CHANNEL_CONFIG[key].label}</p><p className={styles.channelSub}>{CHANNEL_CONFIG[key].sub}</p></div></div>
+                            <button className={`${styles.toggle} ${prefs[key] ? styles.toggleOn : ''}`} onClick={() => void updateChannel(key)}><span className={styles.toggleThumb} /></button>
                           </div>
                         );
                       })}
@@ -811,64 +874,30 @@ export default function SettingsPage() {
               {/* ════ 6. DISPLAY ════ */}
               {activeSection === 'display' && (
                 <>
-                  <div className={styles.sectionHeader}>
-                    <Monitor size={18} className={styles.sectionIcon} />
-                    <div><h3 className={styles.sectionTitle}>Display Preferences</h3><p className={styles.sectionSub}>Customise How Information is Presented</p></div>
-                  </div>
-                  <div className={styles.card}>
-                    <div className={styles.formGrid}>
-                      {DISPLAY_SELECT_FIELDS.map(item => (
-                        <div key={item.key} className={styles.field}>
-                          <label className={styles.label}>{item.label}</label>
-                          <select className={styles.select} value={displayPrefs[item.key]} onChange={e => saveDisplayPrefs({ [item.key]: e.target.value })}>
-                            {item.options.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
-                          </select>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <div className={styles.sectionHeader}><Monitor size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Display Preferences</h3><p className={styles.sectionSub}>Customise How Information is Presented</p></div></div>
+                  <div className={styles.card}><div className={styles.formGrid}>{DISPLAY_SELECT_FIELDS.map(item => (<div key={item.key} className={styles.field}><label className={styles.label}>{item.label}</label><select className={styles.select} value={displayPrefs[item.key]} onChange={e => saveDisplayPrefs({ [item.key]: e.target.value })}>{item.options.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}</select></div>))}</div></div>
                 </>
               )}
 
               {/* ════ 7. DATA SOURCES ════ */}
               {activeSection === 'data-sources' && (
                 <>
-                  <div className={styles.sectionHeader}>
-                    <Database size={18} className={styles.sectionIcon} />
-                    <div><h3 className={styles.sectionTitle}>Data Sources</h3><p className={styles.sectionSub}>Active Ingestion Feeds and Coverage</p></div>
-                  </div>
+                  <div className={styles.sectionHeader}><Database size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Data Sources</h3><p className={styles.sectionSub}>Active Ingestion Feeds and Coverage</p></div></div>
                   <div className={styles.card}>
-                    {Object.entries(stats?.sources ?? {}).length === 0 ? (
-                      <p className={styles.emptyState}>No sources connected yet</p>
-                    ) : (
-                      Object.entries(stats?.sources ?? {}).sort((a,b) => b[1]-a[1]).map(([key, count]) => {
-                        const meta  = SOURCE_META[key] ?? { label: key, color: '#6B7280' };
-                        const total = Object.values(stats?.sources ?? {}).reduce((s,v) => s+v, 0);
-                        const pct   = total > 0 ? Math.round((count/total)*100) : 0;
-                        return (
-                          <div key={key} className={styles.sourceRow}>
-                            <div className={styles.sourceDot} style={{ background: meta.color, boxShadow: `0 0 6px ${meta.color}` }} />
-                            <div className={styles.sourceInfo}>
-                              <p className={styles.sourceLabel}>{meta.label}</p>
-                              <div className={styles.sourceBarWrap}>
-                                <div className={styles.sourceBarFill} style={{ width: `${pct}%`, background: meta.color }} />
-                              </div>
-                            </div>
-                            <div className={styles.sourceStats}>
-                              <span style={{ color: meta.color, fontWeight: 700, fontSize: 14 }}>{count.toLocaleString()}</span>
-                              <span className={styles.sourcePct}>{pct}%</span>
-                            </div>
-                            <Wifi size={13} style={{ color: '#10B981', flexShrink: 0 }} />
-                          </div>
-                        );
-                      })
-                    )}
-                    <div className={styles.sourceFooter}>
-                      <HardDrive size={13} style={{ color: 'var(--text-dim)' }} />
-                      <span className={styles.sourceFooterText}>
-                        {Object.values(stats?.sources ?? {}).reduce((s,v)=>s+v,0).toLocaleString()} total tenders · {Object.keys(stats?.sources ?? {}).length} sources
-                      </span>
-                    </div>
+                    {Object.entries(stats?.sources ?? {}).length === 0 ? <p className={styles.emptyState}>No sources connected yet</p> : Object.entries(stats?.sources ?? {}).sort((a,b) => b[1]-a[1]).map(([key, count]) => {
+                      const meta = SOURCE_META[key] ?? { label: key, color: '#6B7280' };
+                      const total = Object.values(stats?.sources ?? {}).reduce((s,v) => s+v, 0);
+                      const pct = total > 0 ? Math.round((count/total)*100) : 0;
+                      return (
+                        <div key={key} className={styles.sourceRow}>
+                          <div className={styles.sourceDot} style={{ background: meta.color, boxShadow: `0 0 6px ${meta.color}` }} />
+                          <div className={styles.sourceInfo}><p className={styles.sourceLabel}>{meta.label}</p><div className={styles.sourceBarWrap}><div className={styles.sourceBarFill} style={{ width: `${pct}%`, background: meta.color }} /></div></div>
+                          <div className={styles.sourceStats}><span style={{ color: meta.color, fontWeight: 700, fontSize: 14 }}>{count.toLocaleString()}</span><span className={styles.sourcePct}>{pct}%</span></div>
+                          <Wifi size={13} style={{ color: '#10B981', flexShrink: 0 }} />
+                        </div>
+                      );
+                    })}
+                    <div className={styles.sourceFooter}><HardDrive size={13} style={{ color: 'var(--text-dim)' }} /><span className={styles.sourceFooterText}>{Object.values(stats?.sources ?? {}).reduce((s,v)=>s+v,0).toLocaleString()} total tenders · {Object.keys(stats?.sources ?? {}).length} sources</span></div>
                   </div>
                 </>
               )}
@@ -876,10 +905,7 @@ export default function SettingsPage() {
               {/* ════ 8. DATA & PRIVACY ════ */}
               {activeSection === 'data-privacy' && (
                 <>
-                  <div className={styles.sectionHeader}>
-                    <Trash2 size={18} className={styles.sectionIcon} />
-                    <div><h3 className={styles.sectionTitle}>Data & Privacy</h3><p className={styles.sectionSub}>Manage Your Local Data and Preferences</p></div>
-                  </div>
+                  <div className={styles.sectionHeader}><Trash2 size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Data & Privacy</h3><p className={styles.sectionSub}>Manage Your Local Data and Preferences</p></div></div>
                   {[
                     { title: 'Clear Trend History',   sub: 'Removes the 30-day stats history used for change indicators on the Overview page.', icon: Clock,     btn: 'Clear History', color: '#F59E0B', action: clearHistory  },
                     { title: 'Reset All Preferences', sub: 'Resets tender filters, display preferences to defaults. Page will reload.',         icon: RefreshCw, btn: 'Reset',         color: '#3B82F6', action: resetAllPrefs },
@@ -904,14 +930,14 @@ export default function SettingsPage() {
                     <div><h3 className={styles.sectionTitle}>Security</h3><p className={styles.sectionSub}>Account Security and Session Management</p></div>
                   </div>
 
-                  {/* Account status grid */}
+                  {/* Status grid */}
                   <div className={styles.card}>
                     <div className={styles.securityGrid}>
                       {[
                         { label: 'Account Status', value: 'Active',               color: '#10B981' },
                         { label: 'Auth Method',    value: 'Email & Password',      color: 'var(--text-secondary)' },
                         { label: 'Role',           value: user?.role ?? 'analyst', color: '#7C3AED' },
-                        { label: '2FA',            value: totpEnabled ? `Enabled · ${remainingCodes} recovery codes` : 'Disabled', color: totpEnabled ? '#10B981' : '#6B7280' },
+                        { label: '2FA',            value: totpEnabled ? `Enabled · ${remainingCodes} Recovery Codes` : 'Disabled', color: totpEnabled ? '#10B981' : '#6B7280' },
                       ].map(item => (
                         <div key={item.label} className={styles.securityItem}>
                           <p className={styles.securityLabel}>{item.label}</p>
@@ -929,21 +955,15 @@ export default function SettingsPage() {
                       </div>
                       <div className={styles.actionInfo}>
                         <p className={styles.actionTitle}>Two-Factor Authentication</p>
-                        <p className={styles.actionSub}>
-                          {totpEnabled ? '2FA is active — your account is protected with an authenticator app' : 'Add an extra layer of security with an authenticator app'}
-                        </p>
+                        <p className={styles.actionSub}>{totpEnabled ? '2FA is Active — Your Account is Protected with An Authenticator App' : 'Add an Extra Layer of Security with An Authenticator App'}</p> 
                       </div>
                       {totpEnabled ? (
-                        <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }}
-                          onClick={handle2faDisable} disabled={totpLoading}>
-                          {totpLoading ? <RefreshCw size={13} className={styles.spinning} /> : <ShieldOff size={13} />}
-                          Disable 2FA
+                        <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }} onClick={handle2faDisable} disabled={totpLoading}>
+                          {totpLoading ? <RefreshCw size={13} className={styles.spinning} /> : <ShieldOff size={13} />} Disable 2FA
                         </button>
                       ) : (
-                        <button className={styles.btnOutline} style={{ borderColor: '#7C3AED50', color: '#7C3AED' }}
-                          onClick={handle2faSetup} disabled={totpLoading}>
-                          {totpLoading ? <RefreshCw size={13} className={styles.spinning} /> : <ShieldCheck size={13} />}
-                          Enable 2FA
+                        <button className={styles.btnOutline} style={{ borderColor: '#7C3AED50', color: '#7C3AED' }} onClick={handle2faSetup} disabled={totpLoading}>
+                          {totpLoading ? <RefreshCw size={13} className={styles.spinning} /> : <ShieldCheck size={13} />} Enable 2FA
                         </button>
                       )}
                     </div>
@@ -952,95 +972,115 @@ export default function SettingsPage() {
                     {totpSetupMode && totpQr && (
                       <div className={styles.totpSetup}>
                         <div className={styles.totpDivider} />
-                        <p className={styles.totpInstruction}>
-                          Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
-                        </p>
-                        <div className={styles.totpQrWrap}>
-                          <img src={`data:image/png;base64,${totpQr}`} alt="2FA QR Code" className={styles.totpQr} />
-                        </div>
+                        <p className={styles.totpInstruction}>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                        <div className={styles.totpQrWrap}><img src={`data:image/png;base64,${totpQr}`} alt="2FA QR Code" className={styles.totpQr} /></div>
                         {totpSecret && (
                           <div className={styles.totpSecretWrap}>
                             <span className={styles.totpSecretLabel}>Manual entry key:</span>
                             <code className={styles.totpSecret}>{totpSecret}</code>
-                            <button className={styles.totpCopyBtn} onClick={() => { navigator.clipboard.writeText(totpSecret); toast.success('Copied'); }}>
-                              <Copy size={12} />
-                            </button>
+                            <button className={styles.totpCopyBtn} onClick={() => { navigator.clipboard.writeText(totpSecret); toast.success('Copied'); }}><Copy size={12} /></button>
                           </div>
                         )}
                         <div className={styles.totpVerifyRow}>
-                          <input className={styles.input} placeholder="Enter 6-digit code"
-                            value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+                          <input className={styles.input} placeholder="Enter 6-digit code" value={totpCode}
+                            onChange={e => setTotpCode(e.target.value.replace(/\D/g,'').slice(0,6))}
                             maxLength={6} style={{ maxWidth: 180, letterSpacing: '0.2em', textAlign: 'center' }} />
                           <button className={styles.primaryBtn} onClick={handle2faVerify} disabled={totpLoading || totpCode.length !== 6}>
-                            {totpLoading ? <RefreshCw size={13} className={styles.spinning} /> : <Check size={13} />}
-                            Verify & Enable
+                            {totpLoading ? <RefreshCw size={13} className={styles.spinning} /> : <Check size={13} />} Verify & Enable
                           </button>
-                          <button className={styles.ghostBtn} onClick={() => { setTotpSetupMode(false); setTotpQr(null); setTotpCode(''); }}>
-                            Cancel
-                          </button>
+                          <button className={styles.ghostBtn} onClick={() => { setTotpSetupMode(false); setTotpQr(null); setTotpCode(''); }}>Cancel</button>
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Recovery codes card — shows after setup or when running low */}
-                  {totpEnabled && (showRecoveryCodes || remainingCodes < 4) && (
+                  {/* Recovery codes card — only visible when 2FA is enabled */}
+                  {totpEnabled && (
                     <div className={styles.card}>
                       <div className={styles.cardHeaderRow}>
                         <div>
                           <p className={styles.cardSectionTitle}><KeyRound size={14} /> Recovery Codes</p>
                           <p className={styles.cardSectionSub}>
                             {showRecoveryCodes
-                              ? 'Save these codes somewhere safe — each can be used once if you lose your authenticator'
-                              : `Only ${remainingCodes} recovery code${remainingCodes === 1 ? '' : 's'} remaining — regenerate a fresh set`}
+                              ? 'Save These Codes Somewhere Safe — Each Can Only Be Used Once'
+                              : remainingCodes < 4
+                                ? `⚠️ Only ${remainingCodes} Code${remainingCodes === 1 ? '' : 's'} Remaining — Regenerate Soon`
+                                : `${remainingCodes} Codes Available — Verify Your Password to View`}
                           </p>
                         </div>
-                        <button
-                          className={styles.btnOutline}
-                          style={{ borderColor: '#7C3AED50', color: '#7C3AED' }}
-                          onClick={handleRegenerateCodes}
-                          disabled={regenLoading}
-                        >
-                          {regenLoading ? <RefreshCw size={13} className={styles.spinning} /> : <RefreshCw size={13} />}
-                          Regenerate
-                        </button>
+                        <div className={styles.recoveryActions}>
+                          {/* View / Hide toggle button */}
+                          {!showRecoveryCodes ? (
+                            <button
+                              className={styles.btnOutline}
+                              style={{ borderColor: '#3B82F650', color: '#3B82F6' }}
+                              onClick={openViewModal}
+                            >
+                              <Eye size={13} /> View Recovery Codes
+                            </button>
+                          ) : (
+                            <button
+                              className={styles.btnOutline}
+                              style={{ borderColor: '#6B728050', color: '#6B7280' }}
+                              onClick={() => { setShowRecoveryCodes(false); setSavedConfirmed(false); }}
+                            >
+                              <EyeOff size={13} /> Hide Codes
+                            </button>
+                          )}
+                          {/* Regenerate — also password gated */}
+                          <button
+                            className={styles.btnOutline}
+                            style={{ borderColor: '#7C3AED50', color: '#7C3AED' }}
+                            onClick={openRegenModal}
+                            disabled={regenLoading}
+                          >
+                            {regenLoading ? <RefreshCw size={13} className={styles.spinning} /> : <RefreshCw size={13} />}
+                            Regenerate
+                          </button>
+                        </div>
                       </div>
 
-                      {showRecoveryCodes && recoveryCodes.length > 0 && (
-                        <>
-                          <div className={styles.recoveryCodesGrid}>
-                            {recoveryCodes.map((code, i) => (
-                              <div key={i} className={styles.recoveryCodeItem}>
-                                <code className={styles.recoveryCode}>{code}</code>
-                                <button
-                                  className={styles.totpCopyBtn}
-                                  onClick={() => { navigator.clipboard.writeText(code); toast.success('Copied'); }}
-                                  title="Copy code"
-                                >
-                                  <Copy size={12} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          <button
-                            className={styles.copyAllBtn}
-                            onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); toast.success('All codes copied'); }}
+                      {/* Codes grid — only shown after password verification */}
+                      <AnimatePresence>
+                        {showRecoveryCodes && recoveryCodes.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{    opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                            style={{ overflow: 'hidden' }}
                           >
-                            <Copy size={13} /> Copy All Codes
-                          </button>
-                          <label className={styles.savedConfirmRow}>
-                            <input
-                              type="checkbox"
-                              checked={savedConfirmed}
-                              onChange={e => {
-                                setSavedConfirmed(e.target.checked);
-                                if (e.target.checked) setShowRecoveryCodes(false);
-                              }}
-                            />
-                            <span>I've saved these recovery codes in a safe place</span>
-                          </label>
-                        </>
-                      )}
+                            <div className={styles.recoveryCodesGrid} style={{ marginTop: 16 }}>
+                              {recoveryCodes.map((code, i) => (
+                                <div key={i} className={styles.recoveryCodeItem}>
+                                  <code className={styles.recoveryCode}>{code}</code>
+                                  <button
+                                    className={styles.totpCopyBtn}
+                                    onClick={() => { navigator.clipboard.writeText(code); toast.success('Copied'); }}
+                                    title="Copy code"
+                                  >
+                                    <Copy size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              className={styles.copyAllBtn}
+                              onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); toast.success('All Codes Copied'); }}
+                            >
+                              <Copy size={13} /> Copy All Codes
+                            </button>
+                            <label className={styles.savedConfirmRow}>
+                              <input
+                                type="checkbox"
+                                checked={savedConfirmed}
+                                onChange={e => setSavedConfirmed(e.target.checked)}
+                              />
+                              <span>{savedConfirmed ? 'Saved' : "I've Saved These Recovery Codes in a Safe Place"}</span>
+                            </label>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   )}
 
@@ -1049,12 +1089,10 @@ export default function SettingsPage() {
                     <div className={styles.cardHeaderRow}>
                       <div>
                         <p className={styles.cardSectionTitle}><MonitorSmartphone size={14} /> Active Sessions</p>
-                        <p className={styles.cardSectionSub}>Devices currently signed in to your account</p>
+                        <p className={styles.cardSectionSub}>Devices Currently Signed in to Your Account</p>
                       </div>
                       {sessions.filter(s => !s.is_current).length > 0 && (
-                        <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }} onClick={revokeAllSessions}>
-                          Revoke All Others
-                        </button>
+                        <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }} onClick={revokeAllSessions}>Revoke All Others</button>
                       )}
                     </div>
                     {sessionsLoading ? (
@@ -1070,16 +1108,9 @@ export default function SettingsPage() {
                             </div>
                             <div className={styles.sessionInfo}>
                               <p className={styles.sessionAgent}>{s.user_agent ? s.user_agent.slice(0, 60) : 'Unknown device'}</p>
-                              <p className={styles.sessionMeta}>
-                                {s.ip_address ?? 'Unknown IP'} · Last active {new Date(s.last_active_at).toLocaleString()}
-                                {s.is_current && <span className={styles.currentBadge}>Current</span>}
-                              </p>
+                              <p className={styles.sessionMeta}>{s.ip_address ?? 'Unknown IP'} · Last active {new Date(s.last_active_at).toLocaleString()}{s.is_current && <span className={styles.currentBadge}>Current</span>}</p>
                             </div>
-                            {!s.is_current && (
-                              <button className={styles.sessionRevokeBtn} onClick={() => revokeSession(s.id)} title="Revoke session">
-                                <XCircle size={15} />
-                              </button>
-                            )}
+                            {!s.is_current && <button className={styles.sessionRevokeBtn} onClick={() => revokeSession(s.id)} title="Revoke session"><XCircle size={15} /></button>}
                           </div>
                         ))}
                       </div>
@@ -1091,68 +1122,36 @@ export default function SettingsPage() {
               {/* ════ 10. TEAM & ACCESS ════ */}
               {activeSection === 'team' && (
                 <>
-                  <div className={styles.sectionHeader}>
-                    <Users size={18} className={styles.sectionIcon} />
-                    <div><h3 className={styles.sectionTitle}>Team & Access</h3><p className={styles.sectionSub}>Manage Team Members and Roles</p></div>
-                  </div>
+                  <div className={styles.sectionHeader}><Users size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Team & Access</h3><p className={styles.sectionSub}>Manage Team Members and Roles</p></div></div>
 
                   <div className={styles.card}>
                     <div className={styles.teamMember}>
-                      <div className={styles.avatar} style={{ width: 44, height: 44, fontSize: 15, borderRadius: 12 }}>
-                        {avatarSrc ? <img src={avatarSrc} alt="avatar" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : initials}
-                      </div>
-                      <div className={styles.teamInfo}>
-                        <p className={styles.teamName}>{user?.name ?? 'Analyst'}</p>
-                        <p className={styles.teamEmail}>{user?.email ?? ''}</p>
-                      </div>
-                      <span className={styles.roleBadge} style={{
-                        background: user?.role === 'admin' ? 'rgba(124,58,237,0.15)' : 'rgba(16,185,129,0.15)',
-                        color:      user?.role === 'admin' ? '#A78BFA' : '#34D399',
-                        border:     `1px solid ${user?.role === 'admin' ? '#7C3AED40' : '#10B98140'}`,
-                      }}>{user?.role ?? 'analyst'}</span>
+                      <div className={styles.avatar} style={{ width: 44, height: 44, fontSize: 15, borderRadius: 12 }}>{avatarSrc ? <img src={avatarSrc} alt="avatar" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : initials}</div>
+                      <div className={styles.teamInfo}><p className={styles.teamName}>{user?.name ?? 'Analyst'}</p><p className={styles.teamEmail}>{user?.email ?? ''}</p></div>
+                      <span className={styles.roleBadge} style={{ background: user?.role === 'admin' ? 'rgba(124,58,237,0.15)' : 'rgba(16,185,129,0.15)', color: user?.role === 'admin' ? '#A78BFA' : '#34D399', border: `1px solid ${user?.role === 'admin' ? '#7C3AED40' : '#10B98140'}` }}>{user?.role ?? 'analyst'}</span>
                       <span className={styles.youBadge}>You</span>
                     </div>
                   </div>
 
                   <div className={styles.card}>
                     <div className={styles.cardHeaderRow}>
-                      <div>
-                        <p className={styles.cardSectionTitle}><UserPlus size={14} /> Invite Team Members</p>
-                        <p className={styles.cardSectionSub}>Send email invitations to your team</p>
-                      </div>
-                      {teams.length === 0 && (
-                        <button className={styles.btnOutline} style={{ borderColor: '#3B82F650', color: '#3B82F6' }} onClick={createTeam}>
-                          <Plus size={13} /> Create Team
-                        </button>
-                      )}
+                      <div><p className={styles.cardSectionTitle}><UserPlus size={14} /> Invite Team Members</p><p className={styles.cardSectionSub}>Send email invitations to your team</p></div>
+                      {teams.length === 0 && <button className={styles.btnOutline} style={{ borderColor: '#3B82F650', color: '#3B82F6' }} onClick={createTeam}><Plus size={13} /> Create Team</button>}
                     </div>
-                    {teams.length === 0 ? (
-                      <p className={styles.emptyState}>Create a team first to start inviting members</p>
-                    ) : (
+                    {teams.length === 0 ? <p className={styles.emptyState}>Create a team first to start inviting members</p> : (
                       <>
                         <div className={styles.inviteRow}>
-                          <input className={styles.input} placeholder="colleague@company.com"
-                            value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ flex: 1 }} />
-                          <select className={styles.select} value={inviteRole} onChange={e => setInviteRole(e.target.value)} style={{ width: 120 }}>
-                            <option value="analyst">Analyst</option>
-                            <option value="admin">Admin</option>
-                          </select>
+                          <input className={styles.input} placeholder="colleague@company.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ flex: 1 }} />
+                          <select className={styles.select} value={inviteRole} onChange={e => setInviteRole(e.target.value)} style={{ width: 120 }}><option value="analyst">Analyst</option><option value="admin">Admin</option></select>
                           <button className={styles.primaryBtn} onClick={sendInvite}><UserPlus size={13} /> Invite</button>
                         </div>
                         {invitations.length > 0 && (
                           <div className={styles.invitationList}>
                             {invitations.map(inv => (
                               <div key={inv.id} className={styles.invitationRow}>
-                                <div className={styles.invitationInfo}>
-                                  <p className={styles.invitationEmail}>{inv.email}</p>
-                                  <p className={styles.invitationMeta}>{inv.role} · {inv.status} · expires {new Date(inv.expires_at).toLocaleDateString()}</p>
-                                </div>
+                                <div className={styles.invitationInfo}><p className={styles.invitationEmail}>{inv.email}</p><p className={styles.invitationMeta}>{inv.role} · {inv.status} · expires {new Date(inv.expires_at).toLocaleDateString()}</p></div>
                                 <span className={`${styles.inviteStatusBadge} ${INVITE_STATUS_CLASS[inv.status] ?? ''}`}>{inv.status}</span>
-                                {inv.status === 'pending' && (
-                                  <button className={styles.sessionRevokeBtn} onClick={() => revokeInvite(inv.id)} title="Revoke invitation">
-                                    <XCircle size={15} />
-                                  </button>
-                                )}
+                                {inv.status === 'pending' && <button className={styles.sessionRevokeBtn} onClick={() => revokeInvite(inv.id)} title="Revoke invitation"><XCircle size={15} /></button>}
                               </div>
                             ))}
                           </div>
@@ -1163,43 +1162,26 @@ export default function SettingsPage() {
 
                   <div className={styles.card}>
                     <div className={styles.cardHeaderRow}>
-                      <div>
-                        <p className={styles.cardSectionTitle}><KeyRound size={14} /> API Key Management</p>
-                        <p className={styles.cardSectionSub}>Generate keys for external integrations</p>
-                      </div>
+                      <div><p className={styles.cardSectionTitle}><KeyRound size={14} /> API Key Management</p><p className={styles.cardSectionSub}>Generate keys for external integrations</p></div>
                     </div>
                     {createdKey && (
                       <div className={styles.createdKeyBanner}>
                         <AlertTriangle size={14} style={{ color: '#F59E0B', flexShrink: 0 }} />
-                        <div style={{ flex: 1 }}>
-                          <p className={styles.createdKeyTitle}>Copy your key now — it won't be shown again</p>
-                          <code className={styles.createdKeyValue}>{createdKey}</code>
-                        </div>
+                        <div style={{ flex: 1 }}><p className={styles.createdKeyTitle}>Copy your key now — it won't be shown again</p><code className={styles.createdKeyValue}>{createdKey}</code></div>
                         <button className={styles.totpCopyBtn} onClick={() => { navigator.clipboard.writeText(createdKey); toast.success('Copied'); }}><Copy size={13} /></button>
                         <button className={styles.sessionRevokeBtn} onClick={() => setCreatedKey(null)}><XCircle size={14} /></button>
                       </div>
                     )}
                     <div className={styles.inviteRow}>
-                      <input className={styles.input} placeholder='e.g. "Zapier Integration"'
-                        value={newKeyName} onChange={e => setNewKeyName(e.target.value)} style={{ flex: 1 }} />
+                      <input className={styles.input} placeholder='e.g. "Zapier Integration"' value={newKeyName} onChange={e => setNewKeyName(e.target.value)} style={{ flex: 1 }} />
                       <button className={styles.primaryBtn} onClick={createApiKey}><Plus size={13} /> Generate Key</button>
                     </div>
-                    {apiKeysLoading ? (
-                      <div className={styles.emptyState}><RefreshCw size={16} className={styles.spinning} /></div>
-                    ) : apiKeys.length === 0 ? (
-                      <p className={styles.emptyState}>No API keys yet</p>
-                    ) : (
+                    {apiKeysLoading ? <div className={styles.emptyState}><RefreshCw size={16} className={styles.spinning} /></div> : apiKeys.length === 0 ? <p className={styles.emptyState}>No API keys yet</p> : (
                       <div className={styles.apiKeyList}>
                         {apiKeys.map(k => (
                           <div key={k.id} className={styles.apiKeyRow}>
                             <div className={styles.apiKeyIcon}><KeyRound size={14} /></div>
-                            <div className={styles.apiKeyInfo}>
-                              <p className={styles.apiKeyName}>{k.name}</p>
-                              <p className={styles.apiKeyMeta}>
-                                <code>{k.prefix}••••••••</code> · created {new Date(k.created_at).toLocaleDateString()}
-                                {k.last_used_at && ` · last used ${new Date(k.last_used_at).toLocaleDateString()}`}
-                              </p>
-                            </div>
+                            <div className={styles.apiKeyInfo}><p className={styles.apiKeyName}>{k.name}</p><p className={styles.apiKeyMeta}><code>{k.prefix}••••••••</code> · created {new Date(k.created_at).toLocaleDateString()}{k.last_used_at && ` · last used ${new Date(k.last_used_at).toLocaleDateString()}`}</p></div>
                             <button className={styles.sessionRevokeBtn} onClick={() => revokeApiKey(k.id)} title="Revoke key"><Trash size={14} /></button>
                           </div>
                         ))}
