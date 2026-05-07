@@ -23,8 +23,15 @@ RECOVERY_CODE_COUNT = 10
 
 # ── Helpers ───────────────────────────────────────────────────
 def _generate_recovery_codes() -> tuple[list[str], list[str]]:
-    """Returns (plain_codes, hashed_codes). Plain shown once, hashes stored."""
-    plain  = [secrets.token_hex(4).upper() + '-' + secrets.token_hex(4).upper() for _ in range(RECOVERY_CODE_COUNT)]
+    """
+    Returns (plain_codes, hashed_codes).
+    Format: XXXX-XXXX (4 hex chars - 4 hex chars = 9 chars total)
+    token_hex(2) = 4 hex characters per segment.
+    """
+    plain  = [
+        secrets.token_hex(2).upper() + '-' + secrets.token_hex(2).upper()
+        for _ in range(RECOVERY_CODE_COUNT)
+    ]
     hashed = [hashlib.sha256(c.encode()).hexdigest() for c in plain]
     return plain, hashed
 
