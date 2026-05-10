@@ -165,7 +165,7 @@ function PasswordVerifyModal({ onConfirm, onCancel, loading, error }: PasswordMo
         <div className={styles.modalHeader}>
           <div>
             <h3 className={styles.modalTitle}>Verify Your Password</h3>
-            <p className={styles.modalSub}>Enter Your Password to View Recovery Codes</p>
+            <p className={styles.modalSub}>Enter your password to view recovery codes</p>
           </div>
           <button className={styles.modalClose} onClick={onCancel}><X size={16} /></button>
         </div>
@@ -633,7 +633,7 @@ export default function SettingsPage() {
       setCreatedKey(res.data.key);
       setNewKeyName('');
       await loadApiKeys();
-      toast.success("API Key Created — Copy It Now, It Won't Be Shown Again");
+      toast.success("API Key Created — copy it now, it won't be shown again");
     } catch (err) {
       toast.error(axiosErrorDetail(err) ?? 'Failed to create API key');
     }
@@ -988,10 +988,10 @@ export default function SettingsPage() {
                           <p className={styles.cardSectionTitle}><KeyRound size={14} /> Recovery Codes</p>
                           <p className={styles.cardSectionSub}>
                             {showRecoveryCodes
-                              ? 'Save These Codes Somewhere Safe — Each Can Only Be Used Once'
+                              ? 'Save these codes somewhere safe — each can only be used once'
                               : remainingCodes < 4
-                                ? `⚠️ Only ${remainingCodes} Code${remainingCodes === 1 ? '' : 's'} Remaining — Regenerate Soon`
-                                : `${remainingCodes} Codes Available — Verify Your Password to View`}
+                                ? `⚠️ Only ${remainingCodes} code${remainingCodes === 1 ? '' : 's'} remaining — regenerate soon`
+                                : `${remainingCodes} codes available — verify your password to view`}
                           </p>
                         </div>
                         <div className={styles.recoveryActions}>
@@ -1052,7 +1052,7 @@ export default function SettingsPage() {
                             </div>
                             <button
                               className={styles.copyAllBtn}
-                              onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); toast.success('All Codes Copied'); }}
+                              onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); toast.success('All codes copied'); }}
                             >
                               <Copy size={13} /> Copy All Codes
                             </button>
@@ -1062,7 +1062,7 @@ export default function SettingsPage() {
                                 checked={savedConfirmed}
                                 onChange={e => setSavedConfirmed(e.target.checked)}
                               />
-                              <span>{savedConfirmed ? 'Saved' : "I've Saved These Recovery Codes in a Safe Place"}</span>
+                              <span>{savedConfirmed ? '✓ Saved' : "I've saved these recovery codes in a safe place"}</span>
                             </label>
                           </motion.div>
                         )}
@@ -1075,7 +1075,7 @@ export default function SettingsPage() {
                     <div className={styles.cardHeaderRow}>
                       <div>
                         <p className={styles.cardSectionTitle}><MonitorSmartphone size={14} /> Active Sessions</p>
-                        <p className={styles.cardSectionSub}>Devices Currently Signed in to Your Account</p>
+                        <p className={styles.cardSectionSub}>Devices currently signed in to your account</p>
                       </div>
                       {sessions.filter(s => !s.is_current).length > 0 && (
                         <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }} onClick={revokeAllSessions}>Revoke All Others</button>

@@ -611,3 +611,133 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+/* ── Append these to DataSourcesPage.module.css ── */
+
+/* Source dropdown wrapper */
+.sourceDropWrap {
+  position: relative;
+}
+
+/* Dropdown trigger button */
+.sourceDrop {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-align: left;
+}
+.sourceDrop:hover {
+  border-color: var(--border-hover);
+}
+.sourceDropOpen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.sourceDropSelected {
+  border-color: var(--border-hover);
+}
+
+.sourceDropValue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.sourceDropLabel {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.sourceDropScope {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sourceDropPlaceholder {
+  color: var(--text-dim);
+}
+.sourceDropChevron {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* Dropdown menu */
+.sourceDropMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  z-index: 100;
+  overflow: hidden;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.sourceDropItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: left;
+  transition: background 0.1s;
+  border-bottom: 1px solid var(--border);
+}
+.sourceDropItem:last-child { border-bottom: none; }
+.sourceDropItem:hover { background: var(--bg-elevated); }
+.sourceDropItemActive { background: var(--bg-overlay); }
+
+.sourceDropItemLabel {
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+.sourceDropItemScope {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Scope badge on job cards */
+.jobScopePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+}

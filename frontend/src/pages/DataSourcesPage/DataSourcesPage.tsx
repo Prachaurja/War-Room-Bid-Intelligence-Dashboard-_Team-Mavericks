@@ -6,6 +6,7 @@ import {
   Upload, FileSpreadsheet, CheckCircle2, XCircle,
   Clock, Trash2, RefreshCw, Database,
   AlertCircle, ChevronDown, ChevronUp, Loader2,
+  Globe, MapPin,
 } from 'lucide-react';
 import client from '../../api/client';
 import { formatNumber } from '../../utils/formatters';
@@ -26,9 +27,15 @@ interface IngestionJob {
   completed_at: string | null;
 }
 
+interface SourceOption {
+  key:   string;
+  label: string;
+  scope: string;
+}
+
 interface PreviewData {
   headers: string[];
-  rows: string[][];
+  rows:    string[][];
 }
 
 const STATUS_CONFIG = {
@@ -38,41 +45,68 @@ const STATUS_CONFIG = {
   pending:    { color: '#6B7280', icon: Clock,         label: 'Pending'    },
 };
 
+// Scope badge colors
+const SCOPE_COLOR: Record<string, string> = {
+  "All States":             "#7C3AED",
+  "Federal / All States":   "#7C3AED",
+  "Victoria":               "#3B82F6",
+  "New South Wales":        "#06B6D4",
+  "Queensland":             "#F59E0B",
+  "South Australia":        "#EF4444",
+  "Western Australia":      "#10B981",
+  "Tasmania":               "#8B5CF6",
+  "Northern Territory":     "#F97316",
+  "Custom":                 "#6B7280",
+};
+
 export default function DataSourcesPage() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [jobName, setJobName]               = useState('');
-  const [dragOver, setDragOver]             = useState(false);
-  const [selectedFile, setSelectedFile]     = useState<File | null>(null);
-  const [expandedJob, setExpandedJob]       = useState<number | null>(null);
-  const [uploadError, setUploadError]       = useState('');
-  const [historySearch, setHistorySearch]   = useState('');
-  const [previewData, setPreviewData]       = useState<PreviewData | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [selectedSource,   setSelectedSource]   = useState<SourceOption | null>(null);
+  const [customName,       setCustomName]        = useState('');
+  const [sourceDropOpen,   setSourceDropOpen]    = useState(false);
+  const [dragOver,         setDragOver]          = useState(false);
+  const [selectedFile,     setSelectedFile]      = useState<File | null>(null);
+  const [expandedJob,      setExpandedJob]       = useState<number | null>(null);
+  const [uploadError,      setUploadError]       = useState('');
+  const [historySearch,    setHistorySearch]     = useState('');
+  const [previewData,      setPreviewData]       = useState<PreviewData | null>(null);
+  const [previewLoading,   setPreviewLoading]    = useState(false);
+
+  // Fetch available source portals from backend
+  const { data: sources = [] } = useQuery<SourceOption[]>({
+    queryKey: ['ingestion-sources'],
+    queryFn:  async () => (await client.get('/ingestion/sources')).data,
+    staleTime: Infinity,
+  });
 
   const { data: jobs = [], isLoading: jobsLoading, refetch } = useQuery<IngestionJob[]>({
     queryKey: ['ingestion-jobs'],
-    queryFn: async () => (await client.get('/ingestion/jobs')).data,
+    queryFn:  async () => (await client.get('/ingestion/jobs')).data,
     refetchInterval: 10000,
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ file, name }: { file: File; name: string }) => {
+    mutationFn: async ({
+      file,
+      sourceKey,
+      customName,
+    }: { file: File; sourceKey: string; customName: string }) => {
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('job_name', name);
+      formData.append('file',         file);
+      formData.append('source_key',   sourceKey);
+      formData.append('custom_name',  customName);
       const res = await client.post('/ingestion/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return res.data as IngestionJob;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['ingestion-jobs'] });
-      void queryClient.invalidateQueries({ queryKey: ['overview-stats'] });
-      void queryClient.invalidateQueries({ queryKey: ['source-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['ingestion-jobs']    });
+      void queryClient.invalidateQueries({ queryKey: ['overview-stats']    });
+      void queryClient.invalidateQueries({ queryKey: ['source-stats']      });
       setSelectedFile(null);
-      setJobName('');
       setUploadError('');
       setPreviewData(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -87,9 +121,9 @@ export default function DataSourcesPage() {
   const deleteMutation = useMutation({
     mutationFn: async (jobId: number) => client.delete(`/ingestion/jobs/${jobId}`),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['ingestion-jobs'] });
-      void queryClient.invalidateQueries({ queryKey: ['overview-stats'] });
-      void queryClient.invalidateQueries({ queryKey: ['source-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['ingestion-jobs']  });
+      void queryClient.invalidateQueries({ queryKey: ['overview-stats']  });
+      void queryClient.invalidateQueries({ queryKey: ['source-stats']    });
     },
   });
 
@@ -99,14 +133,13 @@ export default function DataSourcesPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const data     = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
-
+        const sheet    = workbook.Sheets[workbook.SheetNames[0]];
+        const allRows  = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
         if (allRows.length > 0) {
-          const headers = (allRows[0] as unknown[]).map(h => String(h ?? ''));
-          const dataRows = allRows.slice(1, 11).map(row =>
+          const headers  = (allRows[0] as unknown[]).map(h => String(h ?? ''));
+          const dataRows = allRows.slice(1, 6).map(row =>
             (row as unknown[]).map(cell => {
               if (cell instanceof Date) return cell.toLocaleDateString('en-AU');
               return String(cell ?? '');
@@ -132,11 +165,8 @@ export default function DataSourcesPage() {
     }
     setSelectedFile(file);
     setUploadError('');
-    if (!jobName.trim()) {
-      setJobName(file.name.replace(/\.[^/.]+$/, ''));
-    }
     generatePreview(file);
-  }, [jobName, generatePreview]);
+  }, [generatePreview]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -146,10 +176,17 @@ export default function DataSourcesPage() {
   }, [handleFileSelect]);
 
   const handleSubmit = () => {
-    if (!selectedFile) { setUploadError('Please select a file'); return; }
-    if (!jobName.trim()) { setUploadError('Please enter a name for this upload'); return; }
+    if (!selectedFile)   { setUploadError('Please select a file'); return; }
+    if (!selectedSource) { setUploadError('Please select a tender portal'); return; }
+    if (selectedSource.key === 'others' && !customName.trim()) {
+      setUploadError('Please enter a name for this portal'); return;
+    }
     setUploadError('');
-    uploadMutation.mutate({ file: selectedFile, name: jobName.trim() });
+    uploadMutation.mutate({
+      file:       selectedFile,
+      sourceKey:  selectedSource.key,
+      customName: customName.trim(),
+    });
   };
 
   const formatDate = (iso: string) =>
@@ -168,6 +205,8 @@ export default function DataSourcesPage() {
     (job.file_name ?? '').toLowerCase().includes(historySearch.toLowerCase()) ||
     job.source_name.toLowerCase().includes(historySearch.toLowerCase())
   );
+
+  const isOthers = selectedSource?.key === 'others';
 
   return (
     <div className={`${styles.page} page-enter`}>
@@ -199,18 +238,112 @@ export default function DataSourcesPage() {
         transition={{ duration: 0.3 }}
       >
         <div className={styles.uploadCardHeader}>
-          <div className={styles.uploadCardIcon}>
-            <Upload size={18} />
-          </div>
+          <div className={styles.uploadCardIcon}><Upload size={18} /></div>
           <div>
             <p className={styles.uploadCardTitle}>Upload Tender File</p>
             <p className={styles.uploadCardSub}>
-              Supports Excel (.xlsx, .xls) and CSV files from any government portal
+              Select the portal, upload your file — data merges instantly into the dashboard
             </p>
           </div>
         </div>
 
-        {/* Drop zone */}
+        {/* ── Source portal dropdown ── */}
+        <div className={styles.formRow}>
+          <label className={styles.formLabel}>
+            Tender Portal <span className={styles.required}>*</span>
+          </label>
+          <div className={styles.sourceDropWrap}>
+            <button
+              className={`${styles.sourceDrop} ${sourceDropOpen ? styles.sourceDropOpen : ''} ${selectedSource ? styles.sourceDropSelected : ''}`}
+              onClick={() => setSourceDropOpen(v => !v)}
+              type="button"
+            >
+              {selectedSource ? (
+                <div className={styles.sourceDropValue}>
+                  <span className={styles.sourceDropLabel}>{selectedSource.label}</span>
+                  <span
+                    className={styles.sourceDropScope}
+                    style={{ background: (SCOPE_COLOR[selectedSource.scope] ?? '#6B7280') + '20', color: SCOPE_COLOR[selectedSource.scope] ?? '#6B7280' }}
+                  >
+                    {selectedSource.scope.includes('Federal') || selectedSource.scope === 'All States'
+                      ? <Globe size={10} />
+                      : <MapPin size={10} />}
+                    {selectedSource.scope}
+                  </span>
+                </div>
+              ) : (
+                <span className={styles.sourceDropPlaceholder}>Select a tender portal…</span>
+              )}
+              <ChevronDown
+                size={14}
+                className={styles.sourceDropChevron}
+                style={{ transform: sourceDropOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}
+              />
+            </button>
+
+            <AnimatePresence>
+              {sourceDropOpen && (
+                <motion.div
+                  className={styles.sourceDropMenu}
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0  }}
+                  exit={{    opacity: 0, y: -6  }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {sources.map(src => (
+                    <button
+                      key={src.key}
+                      className={`${styles.sourceDropItem} ${selectedSource?.key === src.key ? styles.sourceDropItemActive : ''}`}
+                      onClick={() => {
+                        setSelectedSource(src);
+                        setSourceDropOpen(false);
+                        setUploadError('');
+                        if (src.key !== 'others') setCustomName('');
+                      }}
+                    >
+                      <span className={styles.sourceDropItemLabel}>{src.label}</span>
+                      <span
+                        className={styles.sourceDropItemScope}
+                        style={{ background: (SCOPE_COLOR[src.scope] ?? '#6B7280') + '18', color: SCOPE_COLOR[src.scope] ?? '#6B7280' }}
+                      >
+                        {src.scope.includes('Federal') || src.scope === 'All States'
+                          ? <Globe size={9} />
+                          : <MapPin size={9} />}
+                        {src.scope}
+                      </span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Custom name input — only shown when "Others" is selected */}
+          <AnimatePresence>
+            {isOthers && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{    opacity: 0, height: 0    }}
+                transition={{ duration: 0.15 }}
+                style={{ overflow: 'hidden', marginTop: 10 }}
+              >
+                <input
+                  className={styles.formInput}
+                  type="text"
+                  placeholder="Enter portal name (e.g. NT Government Tenders)"
+                  value={customName}
+                  onChange={e => setCustomName(e.target.value)}
+                />
+                <p className={styles.formHint}>
+                  This name will be used as the source label in the dashboard
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* ── Drop zone ── */}
         <div
           className={`${styles.dropZone} ${dragOver ? styles.dropZoneActive : ''} ${selectedFile ? styles.dropZoneHasFile : ''}`}
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -232,6 +365,7 @@ export default function DataSourcesPage() {
                 <p className={styles.fileName}>{selectedFile.name}</p>
                 <p className={styles.fileSize}>
                   {(selectedFile.size / 1024).toFixed(1)} KB — ready to upload
+                  {selectedSource && ` as ${selectedSource.label}`}
                 </p>
               </div>
               <button
@@ -258,8 +392,7 @@ export default function DataSourcesPage() {
         {/* Preview loading */}
         {previewLoading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', color: 'var(--text-dim)', fontSize: 12 }}>
-            <Loader2 size={13} className={styles.spinning} />
-            Reading file preview…
+            <Loader2 size={13} className={styles.spinning} /> Reading file preview…
           </div>
         )}
 
@@ -269,26 +402,23 @@ export default function DataSourcesPage() {
             <div className={styles.previewHeader}>
               <p className={styles.previewTitle}>
                 Preview — {previewData.rows.length} rows · {previewData.headers.length} columns
+                {selectedSource && (
+                  <span style={{ color: 'var(--text-dim)', fontWeight: 400, marginLeft: 8 }}>
+                    · mapped for {selectedSource.label}
+                  </span>
+                )}
               </p>
-              <button className={styles.previewHideBtn} onClick={() => setPreviewData(null)}>
-                Hide
-              </button>
+              <button className={styles.previewHideBtn} onClick={() => setPreviewData(null)}>Hide</button>
             </div>
             <div className={styles.previewTableWrap}>
               <table className={styles.previewTable}>
                 <thead>
-                  <tr>
-                    {previewData.headers.map((h, i) => (
-                      <th key={i} className={styles.previewTh}>{h}</th>
-                    ))}
-                  </tr>
+                  <tr>{previewData.headers.map((h, i) => <th key={i} className={styles.previewTh}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {previewData.rows.map((row, ri) => (
                     <tr key={ri} className={styles.previewTr}>
-                      {previewData.headers.map((_, ci) => (
-                        <td key={ci} className={styles.previewTd}>{row[ci] ?? ''}</td>
-                      ))}
+                      {previewData.headers.map((_, ci) => <td key={ci} className={styles.previewTd}>{row[ci] ?? ''}</td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -297,29 +427,10 @@ export default function DataSourcesPage() {
           </div>
         )}
 
-        {/* Job name input */}
-        <div className={styles.formRow}>
-          <label className={styles.formLabel}>
-            Upload Name <span className={styles.required}>*</span>
-          </label>
-          <input
-            className={styles.formInput}
-            type="text"
-            placeholder="e.g. VIC Tenders May 2026"
-            value={jobName}
-            onChange={e => setJobName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          />
-          <p className={styles.formHint}>
-            This name identifies the upload in your dashboard and as a data source
-          </p>
-        </div>
-
-        {/* Error */}
+        {/* Error banner */}
         {uploadError && (
           <div className={styles.errorBanner}>
-            <AlertCircle size={14} />
-            {uploadError}
+            <AlertCircle size={14} />{uploadError}
           </div>
         )}
 
@@ -327,18 +438,12 @@ export default function DataSourcesPage() {
         <button
           className={styles.uploadBtn}
           onClick={handleSubmit}
-          disabled={uploadMutation.isPending || !selectedFile}
+          disabled={uploadMutation.isPending || !selectedFile || !selectedSource}
         >
           {uploadMutation.isPending ? (
-            <>
-              <Loader2 size={15} className={styles.spinning} />
-              Uploading…
-            </>
+            <><Loader2 size={15} className={styles.spinning} /> Uploading…</>
           ) : (
-            <>
-              <Upload size={15} />
-              Upload & Import
-            </>
+            <><Upload size={15} /> Upload & Import{selectedSource ? ` — ${selectedSource.label}` : ''}</>
           )}
         </button>
 
@@ -352,7 +457,7 @@ export default function DataSourcesPage() {
               exit={{ opacity: 0, height: 0 }}
             >
               <CheckCircle2 size={14} />
-              {uploadMutation.data?.inserted ?? 0} tenders imported successfully
+              {uploadMutation.data?.inserted ?? 0} tenders imported from {uploadMutation.data?.job_name}
             </motion.div>
           )}
         </AnimatePresence>
@@ -367,12 +472,10 @@ export default function DataSourcesPage() {
             <span className={styles.jobCount}>{jobs.length}</span>
           </div>
           <button className={styles.refreshBtn} onClick={() => void refetch()}>
-            <RefreshCw size={13} />
-            Refresh
+            <RefreshCw size={13} /> Refresh
           </button>
         </div>
 
-        {/* Search */}
         {jobs.length > 0 && (
           <div style={{ position: 'relative' }}>
             <input
@@ -395,7 +498,7 @@ export default function DataSourcesPage() {
 
         {jobsLoading ? (
           <div className={styles.loadingList}>
-            {[1, 2, 3].map(i => (
+            {[1,2,3].map(i => (
               <div key={i} className={styles.skeletonRow}>
                 <div className={styles.shimmer} style={{ width: 32, height: 32, borderRadius: 8 }} />
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -409,13 +512,16 @@ export default function DataSourcesPage() {
           <div className={styles.emptyHistory}>
             <FileSpreadsheet size={32} className={styles.emptyIcon} />
             <p className={styles.emptyTitle}>No uploads yet</p>
-            <p className={styles.emptySub}>Upload your first tender file above</p>
+            <p className={styles.emptySub}>Select a portal and upload your first tender file above</p>
           </div>
         ) : (
           <div className={styles.jobList}>
             {filteredJobs.map(job => {
-              const cfg = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.pending;
+              const cfg        = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.pending;
               const isExpanded = expandedJob === job.id;
+              // Find matching source for scope badge
+              const srcMatch   = sources.find(s => s.key === job.source_name);
+              const scopeColor = srcMatch ? (SCOPE_COLOR[srcMatch.scope] ?? '#6B7280') : '#6B7280';
               return (
                 <motion.div
                   key={job.id}
@@ -428,57 +534,39 @@ export default function DataSourcesPage() {
                       className={styles.jobStatusIcon}
                       style={{ background: cfg.color + '20', border: `1px solid ${cfg.color}44` }}
                     >
-                      <cfg.icon
-                        size={14}
-                        style={{
-                          color: cfg.color,
-                          animation: job.status === 'processing' ? 'spin 1s linear infinite' : 'none',
-                        }}
-                      />
+                      <cfg.icon size={14} style={{ color: cfg.color, animation: job.status === 'processing' ? 'spin 1s linear infinite' : 'none' }} />
                     </div>
                     <div className={styles.jobInfo}>
                       <div className={styles.jobNameRow}>
                         <span className={styles.jobName}>{job.job_name}</span>
-                        <span
-                          className={styles.jobStatusPill}
-                          style={{
-                            background: cfg.color + '18',
-                            color: cfg.color,
-                            border: `1px solid ${cfg.color}33`,
-                          }}
-                        >
+                        <span className={styles.jobStatusPill} style={{ background: cfg.color + '18', color: cfg.color, border: `1px solid ${cfg.color}33` }}>
                           {cfg.label}
                         </span>
+                        {srcMatch && (
+                          <span className={styles.jobScopePill} style={{ background: scopeColor + '15', color: scopeColor, border: `1px solid ${scopeColor}30` }}>
+                            {srcMatch.scope.includes('Federal') || srcMatch.scope === 'All States'
+                              ? <Globe size={9} />
+                              : <MapPin size={9} />}
+                            {srcMatch.scope}
+                          </span>
+                        )}
                       </div>
                       <div className={styles.jobMeta}>
                         <span>{job.file_name}</span>
                         <span className={styles.jobMetaDot}>·</span>
                         <span>{formatDate(job.created_at)}</span>
                         {job.status === 'complete' && (
-                          <>
-                            <span className={styles.jobMetaDot}>·</span>
-                            <span style={{ color: '#10B981' }}>
-                              {formatNumber(job.inserted ?? 0)} inserted
-                            </span>
-                          </>
+                          <><span className={styles.jobMetaDot}>·</span><span style={{ color: '#10B981' }}>{formatNumber(job.inserted ?? 0)} inserted</span></>
                         )}
                       </div>
                     </div>
                     <div className={styles.jobActions}>
-                      <button
-                        className={styles.jobActionBtn}
-                        onClick={() => setExpandedJob(isExpanded ? null : job.id)}
-                        title="Details"
-                      >
+                      <button className={styles.jobActionBtn} onClick={() => setExpandedJob(isExpanded ? null : job.id)} title="Details">
                         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </button>
                       <button
                         className={styles.jobDeleteBtn}
-                        onClick={() => {
-                          if (confirm(`Delete "${job.job_name}" and all its tenders?`)) {
-                            deleteMutation.mutate(job.id);
-                          }
-                        }}
+                        onClick={() => { if (confirm(`Delete "${job.job_name}" and all its tenders?`)) deleteMutation.mutate(job.id); }}
                         title="Delete"
                         disabled={deleteMutation.isPending}
                       >
@@ -497,8 +585,12 @@ export default function DataSourcesPage() {
                       >
                         <div className={styles.jobDetailGrid}>
                           <div className={styles.jobDetailItem}>
-                            <span className={styles.jobDetailLabel}>Source Name</span>
-                            <span className={styles.jobDetailValue}>{job.source_name}</span>
+                            <span className={styles.jobDetailLabel}>Portal</span>
+                            <span className={styles.jobDetailValue}>{job.job_name}</span>
+                          </div>
+                          <div className={styles.jobDetailItem}>
+                            <span className={styles.jobDetailLabel}>Source Key</span>
+                            <span className={styles.jobDetailValue} style={{ fontFamily: 'monospace', fontSize: 12 }}>{job.source_name}</span>
                           </div>
                           <div className={styles.jobDetailItem}>
                             <span className={styles.jobDetailLabel}>Total Rows</span>
@@ -506,21 +598,15 @@ export default function DataSourcesPage() {
                           </div>
                           <div className={styles.jobDetailItem}>
                             <span className={styles.jobDetailLabel}>Inserted</span>
-                            <span className={styles.jobDetailValue} style={{ color: '#10B981' }}>
-                              {formatNumber(job.inserted ?? 0)}
-                            </span>
+                            <span className={styles.jobDetailValue} style={{ color: '#10B981' }}>{formatNumber(job.inserted ?? 0)}</span>
                           </div>
                           <div className={styles.jobDetailItem}>
                             <span className={styles.jobDetailLabel}>Updated</span>
-                            <span className={styles.jobDetailValue} style={{ color: '#F59E0B' }}>
-                              {formatNumber(job.updated ?? 0)}
-                            </span>
+                            <span className={styles.jobDetailValue} style={{ color: '#F59E0B' }}>{formatNumber(job.updated ?? 0)}</span>
                           </div>
                           <div className={styles.jobDetailItem}>
                             <span className={styles.jobDetailLabel}>Skipped</span>
-                            <span className={styles.jobDetailValue} style={{ color: '#6B7280' }}>
-                              {formatNumber(job.skipped ?? 0)}
-                            </span>
+                            <span className={styles.jobDetailValue} style={{ color: '#6B7280' }}>{formatNumber(job.skipped ?? 0)}</span>
                           </div>
                           {job.completed_at && (
                             <div className={styles.jobDetailItem}>
@@ -531,8 +617,7 @@ export default function DataSourcesPage() {
                         </div>
                         {job.error_msg && (
                           <div className={styles.jobWarning}>
-                            <AlertCircle size={12} />
-                            {job.error_msg}
+                            <AlertCircle size={12} />{job.error_msg}
                           </div>
                         )}
                       </motion.div>
