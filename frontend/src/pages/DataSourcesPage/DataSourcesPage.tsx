@@ -242,7 +242,7 @@ export default function DataSourcesPage() {
           <div>
             <p className={styles.uploadCardTitle}>Upload Tender File</p>
             <p className={styles.uploadCardSub}>
-              Select the portal, upload your file — data merges instantly into the dashboard
+              Select the Portal, Upload Your File — Data Merges Instantly into the Dashboard
             </p>
           </div>
         </div>
@@ -512,7 +512,7 @@ export default function DataSourcesPage() {
           <div className={styles.emptyHistory}>
             <FileSpreadsheet size={32} className={styles.emptyIcon} />
             <p className={styles.emptyTitle}>No uploads yet</p>
-            <p className={styles.emptySub}>Select a portal and upload your first tender file above</p>
+            <p className={styles.emptySub}>Select a Portal and Upload Your First Tender File Above</p> 
           </div>
         ) : (
           <div className={styles.jobList}>
