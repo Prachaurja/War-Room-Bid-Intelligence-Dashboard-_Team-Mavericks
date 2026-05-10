@@ -1,33 +1,24 @@
 ﻿import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
 import {
   LayoutDashboard, Home, Gavel, BarChart3, FileText,
   Bell, LogOut, Settings, ChevronRight,
-  Target, Wifi, X, RefreshCw, Database, HardDrive,
+  Target, Wifi, HardDrive,
 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { useUIStore } from '../../store/ui.store';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useAlerts } from '../../hooks/useAlerts';
-import { useOverviewStats } from '../../hooks/useTenders';
-import { getSourceDescription, getSourceLabel } from '../../utils/sourceLabels';
 import clsx from 'clsx';
 import styles from './SideBar.module.css';
-
-type SystemPanelKey = 'sources' | null;
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const { sidebarOpen }  = useUIStore();
   const location         = useLocation();
   const navigate         = useNavigate();
-  const queryClient      = useQueryClient();
-  const { status, newTenders, newAlerts, clearCounters } = useWebSocket();
+  const { status, newTenders, newAlerts } = useWebSocket();
   const { data: alertsData } = useAlerts();
-  const { data: stats }      = useOverviewStats();
-  const [systemPanel, setSystemPanel] = useState<SystemPanelKey>(null);
 
   const unreadCount = (alertsData ?? []).filter((a) => !a.read).length;
   const totalBadge  = unreadCount + newAlerts;
@@ -56,66 +47,6 @@ export default function Sidebar() {
   // Read avatar scoped to current user's ID to prevent cross-user contamination.
   const avatarKey = `wr_avatar_${user?.id ?? 'default'}`;
   const avatarSrc = user?.avatar ?? localStorage.getItem(avatarKey) ?? '';
-
-  const systemButtons = [
-    { key: 'sources', label: 'Data Sources', icon: Database },
-  ] as const;
-
-  const closeSystemPanel = () => setSystemPanel(null);
-
-  const renderSystemPanel = () => {
-    if (!systemPanel) return null;
-
-    if (systemPanel === 'sources') {
-      const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
-      const sourceEntries = Object.entries(stats?.sources ?? {})
-        .filter(([, count]) => count > 0)
-        .sort((a, b) => b[1] - a[1]);
-
-      return (
-        <div className={styles.systemPanelBody}>
-          {sourceEntries.map(([sourceName, count]) => (
-            <div key={sourceName} className={styles.sourceCard}>
-              <div>
-                <p className={styles.sourceCardTitle}>{getSourceLabel(sourceName)}</p>
-                <p className={styles.sourceCardSub}>{getSourceDescription(sourceName)}</p>
-              </div>
-              <span className={styles.sourceCardCount}>{count}</span>
-            </div>
-          ))}
-          <div className={styles.sourceRow}>
-            <span className={styles.sourceLabel}>API Endpoint</span>
-            <span className={styles.sourceValue}>{apiUrl}</span>
-          </div>
-          <div className={styles.sourceRow}>
-            <span className={styles.sourceLabel}>WebSocket</span>
-            <span className={styles.sourceValue}>{status}</span>
-          </div>
-          <div className={styles.sourceRow}>
-            <span className={styles.sourceLabel}>Unread Alerts</span>
-            <span className={styles.sourceValue}>{unreadCount}</span>
-          </div>
-          <div className={styles.sourceRow}>
-            <span className={styles.sourceLabel}>New Tenders</span>
-            <span className={styles.sourceValue}>{newTenders}</span>
-          </div>
-          <div className={styles.systemActionRow}>
-            <button
-              className={styles.systemGhostBtn}
-              onClick={() => {
-                clearCounters();
-                void queryClient.invalidateQueries();
-              }}
-            >
-              <RefreshCw size={13} />
-              Refresh
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <AnimatePresence>
@@ -232,20 +163,9 @@ export default function Sidebar() {
           <div className={styles.divider} />
 
           <div className={styles.systemLinks}>
-            {systemButtons.map((button) => (
-              <button
-                key={button.key}
-                className={clsx(styles.systemItem, systemPanel === button.key && styles.systemItemActive)}
-                onClick={() => setSystemPanel((current) => current === button.key ? null : button.key)}
-              >
-                <button.icon size={15} />
-                <span>{button.label}</span>
-              </button>
-            ))}
             <button
               className={clsx(styles.systemItem, location.pathname === '/settings' && styles.systemItemActive)}
               onClick={() => {
-                closeSystemPanel();
                 navigate('/settings');
               }}
             >
@@ -254,35 +174,11 @@ export default function Sidebar() {
             </button>
           </div>
 
-          <AnimatePresence>
-            {systemPanel && (
-              <motion.div
-                className={styles.systemPanel}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{    opacity: 0, y: 8 }}
-              >
-                <div className={styles.systemPanelHeader}>
-                  <div>
-                    <p className={styles.systemPanelTitle}>Data Sources</p>
-                    <p className={styles.systemPanelSub}>
-                      Active feeds, source coverage, and connectivity status
-                    </p>
-                  </div>
-                  <button className={styles.systemPanelClose} onClick={closeSystemPanel}>
-                    <X size={14} />
-                  </button>
-                </div>
-                {renderSystemPanel()}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           <div className={styles.divider} />
 
           {/* User section with per-user avatar */}
           <div className={styles.userSection}>
-            <div className={styles.avatar}>
+            <div className={clsx(styles.avatar, avatarSrc ? styles.avatarWithImage : styles.avatarFallback)}>
               {avatarSrc
                 ? <img
                     src={avatarSrc}
