@@ -266,11 +266,7 @@ export default function LoginPage() {
                 <h2 className={styles.title}>
                   {totpMode === 'app' ? 'Two-Factor Auth' : 'Recovery Code'}
                 </h2>
-                <p className={styles.subtitle}>
-                  {totpMode === 'app'
-                    ? 'Enter the 6-digit code from your authenticator app'
-                    : 'Enter one of your saved recovery codes'}
-                </p>
+                <p className={styles.totpHint}>Signed in as <strong>{email}</strong></p>
               </div>
 
               <form onSubmit={handleTotpSubmit} className={styles.form}>
@@ -295,10 +291,9 @@ export default function LoginPage() {
                         maxLength={6} disabled={loading} autoComplete="one-time-code"
                       />
                     </div>
-                    <p className={styles.totpHint}>Signed in as <strong>{email}</strong></p>
                   </div>
                 )}
-
+                
                 {/* Recovery code input */}
                 {totpMode === 'recovery' && (
                   <div className={styles.field}>
@@ -316,11 +311,14 @@ export default function LoginPage() {
                         autoComplete="off"
                       />
                     </div>
-                    <p className={styles.totpHint}>
-                      Format: <code>XXXX-XXXX</code> · Each code can only be used once
-                    </p>
                   </div>
                 )}
+
+                <p className={styles.subtitle}>
+                  {totpMode === 'app'
+                    ? 'Enter the 6-digit code from your authenticator app'
+                    : 'Enter one of your saved recovery codes'}
+                </p>
 
                 {error && (
                   <motion.div className={styles.error} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
@@ -340,8 +338,8 @@ export default function LoginPage() {
                   onClick={totpMode === 'app' ? switchToRecovery : switchToApp}
                   disabled={loading}>
                   {totpMode === 'app'
-                    ? '🔑 Use a recovery code instead'
-                    : '📱 Use authenticator app instead'}
+                    ? 'Recovery code'
+                    : 'Authenticator app'}
                 </button>
 
                 <button type="button" className={styles.backBtn} onClick={goBack} disabled={loading}>
