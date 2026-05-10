@@ -65,12 +65,19 @@ const CHANNEL_CONFIG: Record<ChannelKey, { label: string; sub: string; icon: Rea
   push:  { label: 'Browser Notifications', sub: 'Desktop push notifications',   icon: Bell       },
 };
 
+// Keys must match source_config.py source_name values exactly
 const SOURCE_META: Record<string, { label: string; color: string }> = {
-  austender:   { label: 'AusTender',   color: '#7C3AED' },
-  tendersnet:  { label: 'Tenders.Net', color: '#10B981' },
-  qld_tenders: { label: 'QLD Tenders', color: '#F59E0B' },
-  nsw_etender: { label: 'NSW eTender', color: '#3B82F6' },
-  manual:      { label: 'Manual',      color: '#EC4899' },
+  austender:           { label: 'AusTender',                     color: '#7C3AED' },
+  tenders_net:         { label: 'Tenders.Net',                   color: '#10B981' },
+  qld_tenders:         { label: 'QLD Tenders',                   color: '#F59E0B' },
+  nsw_etender:         { label: 'NSW eTender',                   color: '#3B82F6' },
+  buying_for_victoria: { label: 'Buying for Victoria',           color: '#06B6D4' },
+  sa_tenders:          { label: 'SA Tenders',                    color: '#EF4444' },
+  wa_tenders:          { label: 'Tenders WA',                    color: '#10B981' },
+  qtenders:            { label: 'QTenders',                      color: '#F59E0B' },
+  nt_tenders:          { label: 'Quotations and Tenders Online', color: '#F97316' },
+  tas_tenders:         { label: 'Tasmanian Government Tenders',  color: '#8B5CF6' },
+  manual:              { label: 'Manual Upload',                 color: '#EC4899' },
 };
 
 type DisplayPrefs = {
@@ -159,7 +166,7 @@ function PasswordVerifyModal({ onConfirm, onCancel, loading, error }: PasswordMo
           </div>
           <div>
             <h3 className={styles.modalTitle}>Verify Your Password</h3>
-            <p className={styles.modalSub}>Enter Your Password to View Recovery Codes</p>
+            <p className={styles.modalSub}>Enter your password to view recovery codes</p>
           </div>
           <button className={styles.modalClose} onClick={onCancel}><XCircle size={18} /></button>
         </div>
@@ -623,7 +630,7 @@ export default function SettingsPage() {
       setCreatedKey(res.data.key);
       setNewKeyName('');
       await loadApiKeys();
-      toast.success("API Key Created — Copy It Now, It Won't Be Shown Again");
+      toast.success("API Key Created — copy it now, it won't be shown again");
     } catch (err) {
       toast.error(axiosErrorDetail(err) ?? 'Failed to create API key');
     }
@@ -937,7 +944,7 @@ export default function SettingsPage() {
                         { label: 'Account Status', value: 'Active',               color: '#10B981' },
                         { label: 'Auth Method',    value: 'Email & Password',      color: 'var(--text-secondary)' },
                         { label: 'Role',           value: user?.role ?? 'analyst', color: '#7C3AED' },
-                        { label: '2FA',            value: totpEnabled ? `Enabled · ${remainingCodes} Recovery Codes` : 'Disabled', color: totpEnabled ? '#10B981' : '#6B7280' },
+                        { label: '2FA',            value: totpEnabled ? `Enabled · ${remainingCodes} recovery codes` : 'Disabled', color: totpEnabled ? '#10B981' : '#6B7280' },
                       ].map(item => (
                         <div key={item.label} className={styles.securityItem}>
                           <p className={styles.securityLabel}>{item.label}</p>
@@ -955,7 +962,7 @@ export default function SettingsPage() {
                       </div>
                       <div className={styles.actionInfo}>
                         <p className={styles.actionTitle}>Two-Factor Authentication</p>
-                        <p className={styles.actionSub}>{totpEnabled ? '2FA is Active — Your Account is Protected with An Authenticator App' : 'Add an Extra Layer of Security with An Authenticator App'}</p> 
+                        <p className={styles.actionSub}>{totpEnabled ? '2FA is active — your account is protected with an authenticator app' : 'Add an extra layer of security with an authenticator app'}</p>
                       </div>
                       {totpEnabled ? (
                         <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }} onClick={handle2faDisable} disabled={totpLoading}>
@@ -1002,10 +1009,10 @@ export default function SettingsPage() {
                           <p className={styles.cardSectionTitle}><KeyRound size={14} /> Recovery Codes</p>
                           <p className={styles.cardSectionSub}>
                             {showRecoveryCodes
-                              ? 'Save These Codes Somewhere Safe — Each Can Only Be Used Once'
+                              ? 'Save these codes somewhere safe — each can only be used once'
                               : remainingCodes < 4
-                                ? `⚠️ Only ${remainingCodes} Code${remainingCodes === 1 ? '' : 's'} Remaining — Regenerate Soon`
-                                : `${remainingCodes} Codes Available — Verify Your Password to View`}
+                                ? `⚠️ Only ${remainingCodes} code${remainingCodes === 1 ? '' : 's'} remaining — regenerate soon`
+                                : `${remainingCodes} codes available — verify your password to view`}
                           </p>
                         </div>
                         <div className={styles.recoveryActions}>
@@ -1066,7 +1073,7 @@ export default function SettingsPage() {
                             </div>
                             <button
                               className={styles.copyAllBtn}
-                              onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); toast.success('All Codes Copied'); }}
+                              onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); toast.success('All codes copied'); }}
                             >
                               <Copy size={13} /> Copy All Codes
                             </button>
@@ -1076,7 +1083,7 @@ export default function SettingsPage() {
                                 checked={savedConfirmed}
                                 onChange={e => setSavedConfirmed(e.target.checked)}
                               />
-                              <span>{savedConfirmed ? 'Saved' : "I've Saved These Recovery Codes in a Safe Place"}</span>
+                              <span>{savedConfirmed ? '✓ Saved' : "I've saved these recovery codes in a safe place"}</span>
                             </label>
                           </motion.div>
                         )}
@@ -1089,7 +1096,7 @@ export default function SettingsPage() {
                     <div className={styles.cardHeaderRow}>
                       <div>
                         <p className={styles.cardSectionTitle}><MonitorSmartphone size={14} /> Active Sessions</p>
-                        <p className={styles.cardSectionSub}>Devices Currently Signed in to Your Account</p>
+                        <p className={styles.cardSectionSub}>Devices currently signed in to your account</p>
                       </div>
                       {sessions.filter(s => !s.is_current).length > 0 && (
                         <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }} onClick={revokeAllSessions}>Revoke All Others</button>
