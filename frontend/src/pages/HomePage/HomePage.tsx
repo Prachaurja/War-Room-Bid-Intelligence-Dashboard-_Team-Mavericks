@@ -25,7 +25,11 @@ const SOURCE_CONFIG: Record<string, {
   tendersnet:  { label: 'Tenders.Net', color: '#10B981', bg: 'rgba(16,185,129,0.1)',  icon: Globe,    desc: 'National Tender Aggregator' },
   qld_tenders: { label: 'QLD Tenders', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  icon: Database, desc: 'Queensland Government Tenders' },
   nsw_etender: { label: 'NSW eTender', color: '#3B82F6', bg: 'rgba(59,130,246,0.1)',  icon: Database, desc: 'New South Wales eTendering' },
-  manual:      { label: 'Manual',      color: '#EC4899', bg: 'rgba(236,72,153,0.1)',  icon: Database, desc: 'Manually Added Opportunities' },
+  vic_tenders: { label: 'VIC Tenders', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)',   icon: Database, desc: 'Victorian Government Tenders' },
+  wa_tenders:  { label: 'WA Tenders',  color: '#EC4899', bg: 'rgba(236,72,153,0.1)',  icon: Database, desc: 'Western Australian Tenders' },
+  sa_tenders:  { label: 'SA Tenders',  color: '#10B981', bg: 'rgba(16,185,129,0.1)',  icon: Database, desc: 'South Australian Tenders' },
+  tas_tenders: { label: 'TAS Tenders', color: '#84CC16', bg: 'rgba(132,204,22,0.1)',  icon: Database, desc: 'Tasmanian Government Tenders' },
+  manual:      { label: 'Manual',      color: '#6B7280', bg: 'rgba(107,114,128,0.1)',  icon: Database, desc: 'Manually Added Opportunities' },
 };
 
 const SECTOR_COLORS: Record<string, string> = {
@@ -276,8 +280,8 @@ export default function HomePage() {
               .map(s => {
                 const STATE_COLORS: Record<string, string> = {
                   NSW: '#3B82F6', VIC: '#8B5CF6', QLD: '#F59E0B',
-                  SA:  '#06B6D4', WA:  '#EC4899', ACT: '#F97316',
-                  NT:  '#EF4444', TAS: '#84CC16',
+                  SA:  '#10B981', WA:  '#EC4899', ACT: '#F97316',
+                  NT:  '#06B6D4', TAS: '#84CC11', 
                 };
                 const color = STATE_COLORS[s.state] ?? '#6B7280';
                 return (
