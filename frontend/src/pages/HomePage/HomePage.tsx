@@ -276,7 +276,7 @@ export default function HomePage() {
               .map(s => {
                 const STATE_COLORS: Record<string, string> = {
                   NSW: '#3B82F6', VIC: '#8B5CF6', QLD: '#F59E0B',
-                  SA:  '#10B981', WA:  '#EC4899', ACT: '#06B6D4',
+                  SA:  '#06B6D4', WA:  '#EC4899', ACT: '#F97316',
                   NT:  '#EF4444', TAS: '#84CC16',
                 };
                 const color = STATE_COLORS[s.state] ?? '#6B7280';

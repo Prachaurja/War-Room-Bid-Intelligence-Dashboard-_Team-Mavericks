@@ -147,6 +147,17 @@
     flex: 1;
     position: relative;
     min-height: 380px;
+    --map-label: rgba(240,246,252,0.9);
+    --map-label-active: #ffffff;
+    --map-label-shadow: rgba(0,0,0,0.55);
+    --map-callout-line: rgba(240,246,252,0.5);
+  }
+
+  :global([data-theme='light']) .mapSvgWrap {
+    --map-label: rgba(15,23,42,0.82);
+    --map-label-active: #0f172a;
+    --map-label-shadow: rgba(255,255,255,0.75);
+    --map-callout-line: rgba(15,23,42,0.42);
   }
   
   .mapSvg {
@@ -165,7 +176,9 @@
     border-radius: var(--radius-lg);
     padding: 12px 14px;
     min-width: 180px;
+    max-width: 240px;
     box-shadow: var(--shadow-lg);
+    transform: translate3d(0, 0, 0);
   }
   
   .tooltipHeader {
