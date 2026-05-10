@@ -10,7 +10,7 @@ import pandas as pd
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 
-from app.ingestion.source_config import build_column_map, get_source, SOURCES
+from app.ingestion.source_config import build_column_map, get_source
 
 logger = logging.getLogger(__name__)
 
@@ -317,16 +317,12 @@ def _parse_wa_tenders(
 
             # ── Parse col 0: ref_no / tender_type / status ──
             parts0 = [p.strip() for p in col0.split('\n') if p.strip()]
-            ref_no      = parts0[0] if parts0 else f"wa-{idx}"
-            # Type is in parentheses on second line
-            tender_type = ""
-            status_raw  = "open"
+            ref_no     = parts0[0] if parts0 else f"wa-{idx}"
+            status_raw = "open"
             for p in parts0[1:]:
                 p_clean = p.strip('()')
-                if p_clean and not p_clean.lower() in ("tender", "request", "rfq", "rfp", "eoi"):
-                    if "sourcing" in p_clean.lower() or "invited" in p_clean.lower() or "open" in p_clean.lower():
-                        tender_type = p_clean
-                    elif p_clean.lower() in ("current", "closed", "cancelled", "awarded"):
+                if p_clean and p_clean.lower() not in ("tender", "request", "rfq", "rfp", "eoi"):
+                    if p_clean.lower() in ("current", "closed", "cancelled", "awarded"):
                         status_raw = p_clean.lower()
 
             # ── Parse col 1: title / agency / unspsc ──
