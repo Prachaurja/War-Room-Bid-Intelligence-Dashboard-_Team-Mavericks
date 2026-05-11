@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
+﻿import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
@@ -6,7 +7,7 @@ import {
   Upload, FileSpreadsheet, CheckCircle2, XCircle,
   Clock, Trash2, RefreshCw, Database,
   AlertCircle, ChevronDown, ChevronUp, Loader2,
-  Globe, MapPin,
+  Globe, MapPin, X,
 } from 'lucide-react';
 import client from '../../api/client';
 import { formatNumber } from '../../utils/formatters';
@@ -62,6 +63,7 @@ const SCOPE_COLOR: Record<string, string> = {
 export default function DataSourcesPage() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sourceDropRef = useRef<HTMLDivElement>(null);
 
   const [selectedSource,   setSelectedSource]   = useState<SourceOption | null>(null);
   const [customName,       setCustomName]        = useState('');
@@ -70,9 +72,11 @@ export default function DataSourcesPage() {
   const [selectedFile,     setSelectedFile]      = useState<File | null>(null);
   const [expandedJob,      setExpandedJob]       = useState<number | null>(null);
   const [uploadError,      setUploadError]       = useState('');
+  const [uploadNotice,     setUploadNotice]      = useState('');
   const [historySearch,    setHistorySearch]     = useState('');
   const [previewData,      setPreviewData]       = useState<PreviewData | null>(null);
   const [previewLoading,   setPreviewLoading]    = useState(false);
+  const [deleteTarget,     setDeleteTarget]      = useState<IngestionJob | null>(null);
 
   // Fetch available source portals from backend
   const { data: sources = [] } = useQuery<SourceOption[]>({
@@ -81,7 +85,7 @@ export default function DataSourcesPage() {
     staleTime: Infinity,
   });
 
-  const { data: jobs = [], isLoading: jobsLoading, refetch } = useQuery<IngestionJob[]>({
+  const { data: jobs = [], isLoading: jobsLoading, isFetching: jobsFetching, refetch } = useQuery<IngestionJob[]>({
     queryKey: ['ingestion-jobs'],
     queryFn:  async () => (await client.get('/ingestion/jobs')).data,
     refetchInterval: 10000,
@@ -108,19 +112,26 @@ export default function DataSourcesPage() {
       void queryClient.invalidateQueries({ queryKey: ['source-stats']      });
       setSelectedFile(null);
       setUploadError('');
+      setUploadNotice('Upload accepted. The file is being processed in the background.');
       setPreviewData(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })
-        ?.response?.data?.detail ?? 'Upload failed';
-      setUploadError(msg);
+        ?.response?.data?.detail;
+      const fallbackNotice = 'Upload may still be processing. Refresh Uploaded History to check its status.';
+      void queryClient.invalidateQueries({ queryKey: ['ingestion-jobs'] });
+      setUploadNotice(msg ? `${msg}. ${fallbackNotice}` : fallbackNotice);
+      setUploadError('');
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (jobId: number) => client.delete(`/ingestion/jobs/${jobId}`),
-    onSuccess: () => {
+    onSuccess: (_res, jobId) => {
+      queryClient.setQueryData<IngestionJob[]>(['ingestion-jobs'], current =>
+        (current ?? []).filter(job => job.id !== jobId)
+      );
       void queryClient.invalidateQueries({ queryKey: ['ingestion-jobs']  });
       void queryClient.invalidateQueries({ queryKey: ['overview-stats']  });
       void queryClient.invalidateQueries({ queryKey: ['source-stats']    });
@@ -160,11 +171,13 @@ export default function DataSourcesPage() {
     const allowed = ['.xlsx', '.xls', '.xlsm', '.csv'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowed.includes(ext)) {
+      setUploadNotice('');
       setUploadError(`Unsupported file type. Allowed: ${allowed.join(', ')}`);
       return;
     }
     setSelectedFile(file);
     setUploadError('');
+    setUploadNotice('');
     generatePreview(file);
   }, [generatePreview]);
 
@@ -176,12 +189,14 @@ export default function DataSourcesPage() {
   }, [handleFileSelect]);
 
   const handleSubmit = () => {
-    if (!selectedFile)   { setUploadError('Please select a file'); return; }
-    if (!selectedSource) { setUploadError('Please select a tender portal'); return; }
+    if (!selectedFile)   { setUploadNotice(''); setUploadError('Please select a file'); return; }
+    if (!selectedSource) { setUploadNotice(''); setUploadError('Please select a tender portal'); return; }
     if (selectedSource.key === 'others' && !customName.trim()) {
+      setUploadNotice('');
       setUploadError('Please enter a name for this portal'); return;
     }
     setUploadError('');
+    setUploadNotice('Uploading file. Processing will continue in Uploaded History.');
     uploadMutation.mutate({
       file:       selectedFile,
       sourceKey:  selectedSource.key,
@@ -208,10 +223,111 @@ export default function DataSourcesPage() {
 
   const isOthers = selectedSource?.key === 'others';
 
+  useEffect(() => {
+    if (!sourceDropOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!sourceDropRef.current?.contains(event.target as Node)) {
+        setSourceDropOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSourceDropOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [sourceDropOpen]);
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget.id, {
+      onSuccess: () => setDeleteTarget(null),
+    });
+  };
+
   return (
     <div className={`${styles.page} page-enter`}>
+      {createPortal(
+        <AnimatePresence>
+          {deleteTarget && (
+            <motion.div
+              className={styles.confirmOverlay}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!deleteMutation.isPending) setDeleteTarget(null);
+              }}
+            >
+              <motion.div
+                className={styles.confirmDialog}
+                initial={{ opacity: 0, y: 18, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 360, damping: 30 }}
+                onClick={event => event.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-upload-title"
+              >
+                <div className={styles.confirmHeader}>
+                  <div className={styles.confirmTitleBlock}>
+                    <span className={styles.confirmIcon}>
+                      <Trash2 size={17} />
+                    </span>
+                    <div>
+                      <h3 id="delete-upload-title" className={styles.confirmTitle}>Delete upload</h3>
+                    </div>
+                  </div>
+                  <button
+                    className={styles.confirmClose}
+                    onClick={() => setDeleteTarget(null)}
+                    disabled={deleteMutation.isPending}
+                    type="button"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+                <div className={styles.confirmBody}>
+                  <span className={styles.confirmBodyLabel}>Upload to delete</span>
+                  <strong className={styles.confirmJobName}>{deleteTarget.job_name}</strong>
+                  <p className={styles.confirmBodyText}>All tenders imported from this upload will also be removed.</p>
+                </div>
+                <div className={styles.confirmActions}>
+                  <button
+                    className={styles.confirmCancel}
+                    onClick={() => setDeleteTarget(null)}
+                    disabled={deleteMutation.isPending}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={styles.confirmDelete}
+                    onClick={confirmDelete}
+                    disabled={deleteMutation.isPending}
+                    type="button"
+                  >
+                    {deleteMutation.isPending ? (
+                      <><Loader2 size={14} className={styles.spinning} /> Deleting</>
+                    ) : (
+                      <><Trash2 size={14} /> Delete</>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
 
-      {/* ── Header ── */}
+      {/*  Header  */}
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.heading}>Data Sources</h2>
@@ -230,7 +346,7 @@ export default function DataSourcesPage() {
         </div>
       </div>
 
-      {/* ── Upload card ── */}
+      {/*  Upload card  */}
       <motion.div
         className={styles.uploadCard}
         initial={{ opacity: 0, y: 16 }}
@@ -242,17 +358,17 @@ export default function DataSourcesPage() {
           <div>
             <p className={styles.uploadCardTitle}>Upload Tender File</p>
             <p className={styles.uploadCardSub}>
-              Select the portal, upload your file — data merges instantly into the dashboard
+              Select the portal, upload your file - data merges instantly into the dashboard
             </p>
           </div>
         </div>
 
-        {/* ── Source portal dropdown ── */}
+        {/*  Source portal dropdown  */}
         <div className={styles.formRow}>
           <label className={styles.formLabel}>
             Tender Portal <span className={styles.required}>*</span>
           </label>
-          <div className={styles.sourceDropWrap}>
+          <div className={styles.sourceDropWrap} ref={sourceDropRef}>
             <button
               className={`${styles.sourceDrop} ${sourceDropOpen ? styles.sourceDropOpen : ''} ${selectedSource ? styles.sourceDropSelected : ''}`}
               onClick={() => setSourceDropOpen(v => !v)}
@@ -272,7 +388,7 @@ export default function DataSourcesPage() {
                   </span>
                 </div>
               ) : (
-                <span className={styles.sourceDropPlaceholder}>Select a tender portal…</span>
+                <span className={styles.sourceDropPlaceholder}>Select a tender portal...</span>
               )}
               <ChevronDown
                 size={14}
@@ -298,6 +414,7 @@ export default function DataSourcesPage() {
                         setSelectedSource(src);
                         setSourceDropOpen(false);
                         setUploadError('');
+                        setUploadNotice('');
                         if (src.key !== 'others') setCustomName('');
                       }}
                     >
@@ -318,7 +435,7 @@ export default function DataSourcesPage() {
             </AnimatePresence>
           </div>
 
-          {/* Custom name input — only shown when "Others" is selected */}
+          {/* Custom name input 鈥?only shown when "Others" is selected */}
           <AnimatePresence>
             {isOthers && (
               <motion.div
@@ -343,7 +460,7 @@ export default function DataSourcesPage() {
           </AnimatePresence>
         </div>
 
-        {/* ── Drop zone ── */}
+        {/*  Drop zone */}
         <div
           className={`${styles.dropZone} ${dragOver ? styles.dropZoneActive : ''} ${selectedFile ? styles.dropZoneHasFile : ''}`}
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -364,7 +481,7 @@ export default function DataSourcesPage() {
               <div>
                 <p className={styles.fileName}>{selectedFile.name}</p>
                 <p className={styles.fileSize}>
-                  {(selectedFile.size / 1024).toFixed(1)} KB — ready to upload
+                  {(selectedFile.size / 1024).toFixed(1)} KB - ready to upload
                   {selectedSource && ` as ${selectedSource.label}`}
                 </p>
               </div>
@@ -384,7 +501,7 @@ export default function DataSourcesPage() {
             <div className={styles.dropZoneContent}>
               <Upload size={28} className={styles.dropIcon} />
               <p className={styles.dropTitle}>Drop your file here or click to browse</p>
-              <p className={styles.dropSub}>Excel (.xlsx, .xls) or CSV — max 10MB</p>
+              <p className={styles.dropSub}>Excel (.xlsx, .xls) or CSV - max 10MB</p>
             </div>
           )}
         </div>
@@ -392,7 +509,7 @@ export default function DataSourcesPage() {
         {/* Preview loading */}
         {previewLoading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', color: 'var(--text-dim)', fontSize: 12 }}>
-            <Loader2 size={13} className={styles.spinning} /> Reading file preview…
+            <Loader2 size={13} className={styles.spinning} /> Reading file preview...
           </div>
         )}
 
@@ -401,10 +518,10 @@ export default function DataSourcesPage() {
           <div className={styles.previewSection}>
             <div className={styles.previewHeader}>
               <p className={styles.previewTitle}>
-                Preview — {previewData.rows.length} rows · {previewData.headers.length} columns
+                Preview - {previewData.rows.length} rows / {previewData.headers.length} columns
                 {selectedSource && (
                   <span style={{ color: 'var(--text-dim)', fontWeight: 400, marginLeft: 8 }}>
-                    · mapped for {selectedSource.label}
+                    / mapped for {selectedSource.label}
                   </span>
                 )}
               </p>
@@ -434,6 +551,12 @@ export default function DataSourcesPage() {
           </div>
         )}
 
+        {uploadNotice && (
+          <div className={styles.noticeBanner}>
+            <Clock size={14} />{uploadNotice}
+          </div>
+        )}
+
         {/* Submit */}
         <button
           className={styles.uploadBtn}
@@ -441,9 +564,9 @@ export default function DataSourcesPage() {
           disabled={uploadMutation.isPending || !selectedFile || !selectedSource}
         >
           {uploadMutation.isPending ? (
-            <><Loader2 size={15} className={styles.spinning} /> Uploading…</>
+            <><Loader2 size={15} className={styles.spinning} /> Uploading...</>
           ) : (
-            <><Upload size={15} /> Upload & Import{selectedSource ? ` — ${selectedSource.label}` : ''}</>
+            <><Upload size={15} /> Upload & Import{selectedSource ? ` - ${selectedSource.label}` : ''}</>
           )}
         </button>
 
@@ -463,7 +586,7 @@ export default function DataSourcesPage() {
         </AnimatePresence>
       </motion.div>
 
-      {/* ── Job history ── */}
+      {/*  Job history  */}
       <div className={styles.historySection}>
         <div className={styles.historyHeader}>
           <div className={styles.historyTitle}>
@@ -471,8 +594,9 @@ export default function DataSourcesPage() {
             <span>Uploaded History</span>
             <span className={styles.jobCount}>{jobs.length}</span>
           </div>
-          <button className={styles.refreshBtn} onClick={() => void refetch()}>
-            <RefreshCw size={13} /> Refresh
+          <button className={styles.refreshBtn} onClick={() => void refetch()} disabled={jobsFetching}>
+            <RefreshCw size={13} className={jobsFetching ? styles.refreshIconSpin : undefined} />
+            {jobsFetching ? 'Refreshing' : 'Refresh'}
           </button>
         </div>
 
@@ -553,10 +677,10 @@ export default function DataSourcesPage() {
                       </div>
                       <div className={styles.jobMeta}>
                         <span>{job.file_name}</span>
-                        <span className={styles.jobMetaDot}>·</span>
+                        <span className={styles.jobMetaDot}>/</span>
                         <span>{formatDate(job.created_at)}</span>
                         {job.status === 'complete' && (
-                          <><span className={styles.jobMetaDot}>·</span><span style={{ color: '#10B981' }}>{formatNumber(job.inserted ?? 0)} inserted</span></>
+                          <><span className={styles.jobMetaDot}>/</span><span style={{ color: '#10B981' }}>{formatNumber(job.inserted ?? 0)} inserted</span></>
                         )}
                       </div>
                     </div>
@@ -566,7 +690,7 @@ export default function DataSourcesPage() {
                       </button>
                       <button
                         className={styles.jobDeleteBtn}
-                        onClick={() => { if (confirm(`Delete "${job.job_name}" and all its tenders?`)) deleteMutation.mutate(job.id); }}
+                        onClick={() => setDeleteTarget(job)}
                         title="Delete"
                         disabled={deleteMutation.isPending}
                       >
