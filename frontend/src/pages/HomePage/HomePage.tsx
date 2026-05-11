@@ -6,7 +6,7 @@ import {
   Shield, Globe, BarChart3,
   Bell, Zap,
 } from 'lucide-react';
-import AustraliaMap from '../../components/home/AustraliaMap';
+import AustraliaMap, { type StateStat } from '../../components/home/AustraliaMap';
 import { useOverviewStats, useStateStats, useSectorStats } from '../../hooks/useTenders';
 import { useAlerts } from '../../hooks/useAlerts';
 import { useAuth } from '../../hooks/useAuth';
@@ -42,6 +42,43 @@ const SECTOR_LABELS: Record<string, string> = {
   facility_management: 'Facility Mgmt', construction: 'Construction',
   cleaning: 'Cleaning', it_services: 'IT Services',
   healthcare: 'Healthcare', transportation: 'Transportation', other: 'Other',
+};
+
+const STATE_ORDER = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'ACT', 'NT', 'TAS'] as const;
+const STATE_COLORS: Record<string, string> = {
+  NSW: '#3B82F6', VIC: '#8B5CF6', QLD: '#F59E0B',
+  SA: '#10B981', WA: '#EC4899', ACT: '#F97316',
+  NT: '#06B6D4', TAS: '#84CC16',
+};
+const STATE_NAME_MAP: Record<string, string> = {
+  'NEW SOUTH WALES': 'NSW',
+  VICTORIA: 'VIC',
+  QUEENSLAND: 'QLD',
+  'SOUTH AUSTRALIA': 'SA',
+  'WESTERN AUSTRALIA': 'WA',
+  'AUSTRALIAN CAPITAL TERRITORY': 'ACT',
+  'NORTHERN TERRITORY': 'NT',
+  TASMANIA: 'TAS',
+  NSW: 'NSW',
+  VIC: 'VIC',
+  QLD: 'QLD',
+  SA: 'SA',
+  WA: 'WA',
+  ACT: 'ACT',
+  NT: 'NT',
+  TAS: 'TAS',
+};
+
+const normaliseStateKey = (state?: string | null) => {
+  const raw = state?.toUpperCase().trim() ?? '';
+  if (!raw || raw === 'UNKNOWN') return null;
+  const direct = STATE_NAME_MAP[raw];
+  if (direct) return direct;
+  const cleaned = raw.replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const code = cleaned.match(/\b(NSW|VIC|QLD|SA|WA|ACT|NT|TAS)\b/)?.[1];
+  if (code) return code;
+  const fullName = Object.keys(STATE_NAME_MAP).find(name => cleaned.includes(name));
+  return fullName ? STATE_NAME_MAP[fullName] : null;
 };
 
 const STORAGE_KEY_COUNT     = 'wr_last_total_tenders';
@@ -134,10 +171,31 @@ export default function HomePage() {
     [topSectors],
   );
 
-  const validStateStats = useMemo(
-    () => (stateStats ?? []).filter(s => s.state && s.state !== 'Unknown'),
-    [stateStats],
-  );
+  const validStateStats = useMemo<StateStat[]>(() => {
+    const aggregate: Record<string, StateStat> = {};
+    (stateStats ?? []).forEach(s => {
+      const key = normaliseStateKey(s.state);
+      if (!key) return;
+      aggregate[key] = {
+        state: key,
+        count: (aggregate[key]?.count ?? 0) + (s.count ?? 0),
+        total_value: (aggregate[key]?.total_value ?? 0) + (s.total_value ?? 0),
+      };
+    });
+    return Object.values(aggregate);
+  }, [stateStats]);
+
+  const stateLegendItems = useMemo(() => {
+    const statsByState = new Map(validStateStats.map(s => [s.state, s]));
+    return STATE_ORDER.map(state => ({
+      state,
+      count: statsByState.get(state)?.count ?? 0,
+      color: STATE_COLORS[state],
+    })).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return STATE_ORDER.indexOf(a.state) - STATE_ORDER.indexOf(b.state);
+    });
+  }, [validStateStats]);
 
   return (
     <div className={`${styles.page} page-enter`}>
@@ -274,24 +332,13 @@ export default function HomePage() {
           />
 
           <div className={styles.mapLegend}>
-            {validStateStats
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 6)
-              .map(s => {
-                const STATE_COLORS: Record<string, string> = {
-                  NSW: '#3B82F6', VIC: '#8B5CF6', QLD: '#F59E0B',
-                  SA:  '#10B981', WA:  '#EC4899', ACT: '#F97316',
-                  NT:  '#06B6D4', TAS: '#84CC11', 
-                };
-                const color = STATE_COLORS[s.state] ?? '#6B7280';
-                return (
-                  <div key={s.state} className={styles.legendItem}>
-                    <span className={styles.legendDot} style={{ background: color, boxShadow: `0 0 5px ${color}` }} />
-                    <span className={styles.legendState}>{s.state}</span>
-                    <span className={styles.legendCount} style={{ color }}>{formatNumber(s.count)}</span>
-                  </div>
-                );
-              })}
+            {stateLegendItems.map(s => (
+              <div key={s.state} className={styles.legendItem}>
+                <span className={styles.legendDot} style={{ background: s.color, boxShadow: `0 0 5px ${s.color}` }} />
+                <span className={styles.legendState}>{s.state}</span>
+                <span className={styles.legendCount} style={{ color: s.color }}>{formatNumber(s.count)}</span>
+              </div>
+            ))}
           </div>
         </motion.div>
 
