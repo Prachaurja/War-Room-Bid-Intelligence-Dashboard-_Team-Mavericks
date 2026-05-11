@@ -32,8 +32,7 @@ SOURCES: Dict[str, dict] = {
         "parser":        "standard",
         "columns": {
             "title": [
-                "Title", "Tender Title", "Subject", "Description",
-                "tender title", "title",
+                "Title", "Tender Title", "Subject", "tender title", "title"
             ],
             "agency": [
                 "Organisation", "Organization", "Entity", "Buyer",
@@ -77,8 +76,10 @@ SOURCES: Dict[str, dict] = {
         "parser":        "standard",
         "columns": {
             "title": [
-                "ATM Title", "Title", "CN Description", "Description",
-                "Procurement Description", "title",
+                "ATM Title", "Title", "CN Description", "Procurement Description", "title",
+            ],
+            "description": [
+                "Description", "Summary", "Scope", "Brief",
             ],
             "agency": [
                 "Entity", "Agency", "Organisation", "Buyer",
@@ -123,7 +124,7 @@ SOURCES: Dict[str, dict] = {
         "parser":        "standard",
         "columns": {
             "title": [
-                "Title", "Tender Title", "Description", "title",
+                "Title", "Tender Title", "title"
             ],
             "agency": [
                 "Organisation", "Agency", "Entity", "Buyer",
@@ -168,8 +169,8 @@ SOURCES: Dict[str, dict] = {
         "parser":        "standard",
         "columns": {
             "title": [
-                "Title", "Tender Title", "Description", "Subject",
-                "Opportunity Title", "title",
+                "Title", "Tender Title", "Subject",
+                "Opportunity Title", "title"
             ],
             "agency": [
                 "Organisation", "Agency", "Entity", "Buyer",
@@ -214,7 +215,7 @@ SOURCES: Dict[str, dict] = {
         "parser":        "standard",
         "columns": {
             "title": [
-                "Title", "Tender Title", "Description", "title",
+                "Title", "Tender Title", "title"
             ],
             "agency": [
                 "Organisation", "Agency", "Entity", "Buyer",
@@ -266,7 +267,7 @@ SOURCES: Dict[str, dict] = {
         "parser":        "standard",
         "columns": {
             "title": [
-                "Title", "Tender Title", "Description", "Subject", "title",
+                "Title", "Tender Title", "Subject", "title"
             ],
             "agency": [
                 "Organisation", "Agency", "Entity", "Buyer",
@@ -311,8 +312,8 @@ SOURCES: Dict[str, dict] = {
         "parser":        "standard",
         "columns": {
             "title": [
-                "Title", "Description", "Tender Title",
-                "Subject", "title",
+                "Title", "Tender Title",
+                "Subject", "title"
             ],
             "agency": [
                 "Organisation", "Agency", "Entity",
@@ -356,8 +357,7 @@ SOURCES: Dict[str, dict] = {
         "parser":        "standard",
         "columns": {
             "title": [
-                "Title", "Tender Title", "Description",
-                "Subject", "title",
+                "Title", "Tender Title", "Subject", "title"
             ],
             "agency": [
                 "Organisation", "Agency", "Entity",
