@@ -14,7 +14,7 @@ const SOURCE_META: Record<string, { label: string; color: string }> = {
   // Upload-based sources (keys match source_config.py)
   buying_for_victoria:  { label: 'Buying for Victoria',          color: '#06B6D4' },
   sa_tenders:           { label: 'SA Tenders',                   color: '#EF4444' },
-  wa_tenders:           { label: 'Tenders WA',                   color: '#10B981' },
+  wa_tenders:           { label: 'WA Tenders',                   color: '#10B981' },
   qtenders:             { label: 'QTenders',                     color: '#F59E0B' },
   nt_tenders:           { label: 'Quotations and Tenders Online', color: '#F97316' },
   tas_tenders:          { label: 'Tasmanian Government Tenders', color: '#8B5CF6' },

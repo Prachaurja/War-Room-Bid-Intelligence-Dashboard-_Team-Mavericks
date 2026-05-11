@@ -252,7 +252,7 @@ SOURCES: Dict[str, dict] = {
     },
 
     "wa_tenders": {
-        "label":         "Tenders WA",
+        "label":         "WA Tenders",
         "scope":         "Western Australia",
         "state_default": "WA",
         "parser":        "wa_tenders",   # custom multi-line cell parser
