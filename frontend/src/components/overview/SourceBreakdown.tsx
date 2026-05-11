@@ -9,6 +9,7 @@ const SOURCE_META: Record<string, { label: string; color: string }> = {
   // Scraped / API sources
   austender:            { label: 'AusTender',                    color: '#7C3AED' },
   tenders_net:          { label: 'Tenders.Net',                  color: '#10B981' },
+  tendersnet:            { label: 'Tenders.Net',                  color: '#10B981' },
   nsw_etender:          { label: 'NSW eTender',                  color: '#3B82F6' },
   qld_tenders:          { label: 'QLD Tenders',                  color: '#F59E0B' },
   // Upload-based sources (keys match source_config.py)
