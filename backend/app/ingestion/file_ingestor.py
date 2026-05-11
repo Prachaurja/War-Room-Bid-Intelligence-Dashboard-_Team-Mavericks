@@ -21,11 +21,14 @@ GENERIC_COLUMN_MAP = {
     "title":                    "title",
     "tender title":             "title",
     "subject":                  "title",
-    "description":              "title",
     "contract description":     "title",
     "procurement description":  "title",
     "name":                     "title",
     "opportunity title":        "title",
+    # Description
+    "description":              "description",
+    "summary":                  "description",
+    "scope":                    "description",
     # Agency
     "entity":                   "agency",
     "organisation":             "agency",
@@ -225,6 +228,24 @@ def _parse_standard(
     unmapped = [c for c in df.columns if c not in rename_map]
     if unmapped:
         warnings.append(f"Ignored unrecognised columns: {', '.join(str(c) for c in unmapped[:10])}")
+
+    # ── Deduplication guard ───────────────────────────────────────────────
+    # If two source columns map to the same target field (e.g. "Title" and
+    # "Description" both → "title"), keep only the FIRST match and drop the
+    # rest. Without this, pandas creates duplicate-named columns and
+    # row.get("title") returns a Series instead of a scalar, silently
+    # crashing every row in the except block.
+    seen_targets: set = set()
+    deduped_rename: Dict[str, str] = {}
+    for src_col, target_field in rename_map.items():
+        if target_field not in seen_targets:
+            deduped_rename[src_col] = target_field
+            seen_targets.add(target_field)
+        else:
+            warnings.append(
+                f"Column '{src_col}' also maps to '{target_field}' — skipped (duplicate)"
+            )
+    rename_map = deduped_rename
 
     df = df.rename(columns=rename_map)
 
