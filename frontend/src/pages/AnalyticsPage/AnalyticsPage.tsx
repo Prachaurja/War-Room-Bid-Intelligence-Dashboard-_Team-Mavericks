@@ -16,6 +16,7 @@ import {
   useSourceBreakdown, useStatusBreakdown, useClosingSoon,
   useSourceFreshness, useClosingByMonth,
   useWinWindow, useSectorStateHeatmap, useAgencyFrequency, useValueScatter,
+  useSectorTreemap, useSectorStatusBreakdown,
   type ScatterPoint,
 } from '../../hooks/useAnalytics';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
@@ -49,6 +50,20 @@ function heatColor(value: number, max: number): string {
   const t = Math.min(value / max, 1);
   return `rgba(124,58,237,${0.08 + t * 0.82})`;
 }
+
+// Local sector label map — guaranteed correct capitalisation
+const SECTOR_LABEL_MAP: Record<string, string> = {
+  facility_management: 'Facility Mgmt',
+  construction:        'Construction',
+  cleaning:            'Cleaning',
+  it_services:         'IT Services',
+  healthcare:          'Healthcare',
+  transportation:      'Transportation',
+  utilities:           'Utilities',
+  other:               'Other',
+};
+const getSectorLabel = (sec: string): string =>
+  SECTOR_LABEL_MAP[sec] ?? sec.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
 // ── Tooltips ──────────────────────────────────────────────────
 type TooltipEntry = { color: string; name: string; value: number };
@@ -95,16 +110,6 @@ const Empty = ({ label }: { label: string }) => (
 // ── Page ──────────────────────────────────────────────────────
 export default function AnalyticsPage() {
   const [activeMetric, setActiveMetric] = useState<'count' | 'value'>('count');
-  const [dateFrom, setDateFrom]         = useState('');
-  const [dateTo,   setDateTo]           = useState('');
-
-  const applyPreset = (months: number | null) => {
-    if (months === null) { setDateFrom(''); setDateTo(''); return; }
-    const from = new Date(); from.setMonth(from.getMonth() - months);
-    const to   = new Date(); to.setMonth(to.getMonth() + months);
-    setDateFrom(from.toISOString().split('T')[0]);
-    setDateTo(to.toISOString().split('T')[0]);
-  };
 
   // ── Data hooks ────────────────────────────────────────────
   const { data: sectorData,    isLoading: sectorLoading    } = useSectorStats();
@@ -115,11 +120,13 @@ export default function AnalyticsPage() {
   const { data: statusData,    isLoading: statusLoading    } = useStatusBreakdown();
   const { data: closingData,   isLoading: closingLoading   } = useClosingSoon();
   useSourceFreshness();
-  const { data: closingByMonth,isLoading: closingByMonthLoading } = useClosingByMonth(dateFrom || undefined, dateTo || undefined);
+  useClosingByMonth();
   const { data: winWindow,     isLoading: winLoading        } = useWinWindow();
   const { data: heatmap,       isLoading: heatLoading       } = useSectorStateHeatmap();
   const { data: agencyFreq,    isLoading: agencyLoading     } = useAgencyFrequency(15);
   const { data: scatterData,   isLoading: scatterLoading    } = useValueScatter();
+  const { data: treemapData,   isLoading: treemapLoading    } = useSectorTreemap();
+  const { data: sectorStatus,  isLoading: sectorStatusLoading } = useSectorStatusBreakdown();
 
   // ── Derived ───────────────────────────────────────────────
   const KNOWN = new Set(['facility_management','construction','cleaning','it_services','healthcare','transportation','utilities','other']);
@@ -262,27 +269,51 @@ export default function AnalyticsPage() {
         </div>
         {winLoading ? <Shimmer h={260} /> : !winWindow?.data?.length ? <Empty label="No tenders closing in the next 90 days" /> : (
           <div>
-            <ResponsiveContainer width="100%" height={240}>
+            {/* Month summary cards */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+              {winWindow.data.map((month: Record<string, string | number>) => {
+                const total = (winWindow.sectors ?? []).reduce((s: number, sec: string) => s + ((month[sec] as number) ?? 0), 0);
+                return (
+                  <div key={String(month.month)} style={{
+                    flex: 1, background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 12, padding: '12px 16px', textAlign: 'center'
+                  }}>
+                    <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 4px' }}>{String(month.month)}</p>
+                    <p style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{total}</p>
+                    <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '2px 0 0' }}>tenders closing</p>
+                  </div>
+                );
+              })}
+            </div>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={winWindow.data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
                 <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                {(winWindow.sectors ?? []).map((sec, i) => (
-                  <Bar key={sec} dataKey={sec} name={sectorLabel(sec)} stackId="win"
-                    fill={sectorColor(sec)} maxBarSize={60}
-                    radius={i === (winWindow.sectors.length - 1) ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                {(winWindow.sectors ?? []).map((sec: string, i: number) => (
+                  <Bar key={sec} dataKey={sec} name={getSectorLabel(sec)} stackId="win"
+                    fill={sectorColor(sec)} maxBarSize={80}
+                    radius={i === (winWindow.sectors.length - 1) ? [6, 6, 0, 0] : [0, 0, 0, 0]}
                   />
                 ))}
               </BarChart>
             </ResponsiveContainer>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', marginTop: 12 }}>
-              {(winWindow.sectors ?? []).map(sec => (
-                <div key={sec} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 3, background: sectorColor(sec), flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{sectorLabel(sec)}</span>
-                </div>
-              ))}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', marginTop: 14 }}>
+              {(winWindow.sectors ?? []).map((sec: string) => {
+                const total = winWindow.data.reduce((s: number, m: Record<string, string | number>) => s + ((m[sec] as number) ?? 0), 0);
+                return (
+                  <div key={sec} style={{ display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '4px 10px', borderRadius: 99,
+                    background: sectorColor(sec) + '15',
+                    border: `1px solid ${sectorColor(sec)}30` }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: sectorColor(sec), flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{getSectorLabel(sec)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: sectorColor(sec) }}>{total}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -352,7 +383,7 @@ export default function AnalyticsPage() {
                     style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)', width: 20, textAlign: 'right', flexShrink: 0 }}>#{i + 1}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)', width: 155, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }} title={a.agency}>{a.agency}</span>
-                    <div style={{ flex: 1, height: 6, background: 'var(--bg-overlay)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ flex: 1, height: 5, background: 'var(--bg-overlay)', borderRadius: 4, overflow: 'hidden' }}>
                       <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4 }} />
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', width: 36, textAlign: 'right', flexShrink: 0 }}>{formatNumber(a.count)}</span>
@@ -433,40 +464,136 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* Row 6: Tenders Closing by Month */}
+      {/* Row 6: Radial Sector Completion */}
       <div className={styles.chartCard}>
         <div className={styles.chartHeader}>
           <div>
-            <h3 className={styles.chartTitle}>Tenders Closing by Month</h3>
-            <p className={styles.chartSub}>All Tenders with Close Dates — Filter by Date Range</p>
+            <h3 className={styles.chartTitle}>Sector Completion Rings</h3>
+            <p className={styles.chartSub}>Open · Upcoming · Closed Breakdown Per Sector</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div className={styles.metricToggle}>
-              {[{ label: '6M', months: 6 }, { label: '1Y', months: 12 }, { label: '2Y', months: 24 }, { label: 'All', months: null }].map(p => (
-                <button key={p.label}
-                  className={clsx(styles.toggleBtn, p.months === null && !dateFrom && !dateTo && styles.toggleBtnActive, p.months !== null && dateFrom && styles.toggleBtnActive)}
-                  onClick={() => applyPreset(p.months)}
-                >{p.label}</button>
-              ))}
-            </div>
-            <input type="date" className={styles.formInput} style={{ width: 130, fontSize: 11, padding: '4px 8px', height: 30 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-            <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>→</span>
-            <input type="date" className={styles.formInput} style={{ width: 130, fontSize: 11, padding: '4px 8px', height: 30 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-            <div className={styles.pill}>{(closingByMonth ?? []).reduce((s, d) => s + d.count, 0)} tenders</div>
-          </div>
+          <div className={styles.pill}>All Sectors</div>
         </div>
-        {closingByMonthLoading ? <Shimmer h={240} /> : !closingByMonth?.length ? <Empty label="No data for this date range" /> : (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={closingByMonth} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
-              <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
-                tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)} />
-              <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-              <Bar dataKey="count" name="Tenders" fill="#7C3AED" radius={[4, 4, 0, 0]} maxBarSize={32} />
-            </BarChart>
-          </ResponsiveContainer>
+        {sectorStatusLoading ? <Shimmer h={280} /> : !sectorStatus?.length ? <Empty label="No sector data" /> : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16, padding: '8px 0' }}>
+            {sectorStatus.map(s => {
+              const openPct     = s.total > 0 ? (s.open / s.total) * 100 : 0;
+              const upcomingPct = s.total > 0 ? (s.upcoming / s.total) * 100 : 0;
+              const closedPct   = s.total > 0 ? (s.closed / s.total) * 100 : 0;
+              const r = 38;
+              const circ = 2 * Math.PI * r;
+              const openDash     = (openPct / 100) * circ;
+              const upcomingDash = (upcomingPct / 100) * circ;
+              const closedDash   = (closedPct / 100) * circ;
+              const openOffset     = 0;
+              const upcomingOffset = -openDash;
+              const closedOffset   = -(openDash + upcomingDash);
+              return (
+                <div key={s.sector} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 12, border: '1px solid var(--border)' }}>
+                  {/* Ring */}
+                  <div style={{ position: 'relative', width: 96, height: 96 }}>
+                    <svg width="96" height="96" viewBox="0 0 96 96" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="48" cy="48" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+                      {/* Closed — grey */}
+                      <circle cx="48" cy="48" r={r} fill="none" stroke="#6B7280" strokeWidth="10"
+                        strokeDasharray={`${closedDash} ${circ - closedDash}`}
+                        strokeDashoffset={closedOffset} strokeLinecap="butt" />
+                      {/* Upcoming — amber */}
+                      <circle cx="48" cy="48" r={r} fill="none" stroke="#F59E0B" strokeWidth="10"
+                        strokeDasharray={`${upcomingDash} ${circ - upcomingDash}`}
+                        strokeDashoffset={upcomingOffset} strokeLinecap="butt" />
+                      {/* Open — sector colour */}
+                      <circle cx="48" cy="48" r={r} fill="none" stroke={sectorColor(s.sector)} strokeWidth="10"
+                        strokeDasharray={`${openDash} ${circ - openDash}`}
+                        strokeDashoffset={openOffset} strokeLinecap="butt" />
+                    </svg>
+                    {/* Centre label */}
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>{s.total}</span>
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>total</span>
+                    </div>
+                  </div>
+                  {/* Sector name */}
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center' }}>
+                    {getSectorLabel(s.sector)}
+                  </span>
+                  {/* Mini stats */}
+                  <div style={{ display: 'flex', gap: 6, fontSize: 10 }}>
+                    <span style={{ color: sectorColor(s.sector) }}>{s.open} open</span>
+                    <span style={{ color: 'var(--text-dim)' }}>·</span>
+                    <span style={{ color: '#F59E0B' }}>{s.upcoming} up</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
+      </div>
+
+      {/* Row 7: Treemap */}
+      <div className={styles.chartCard}>
+        <div className={styles.chartHeader}>
+          <div>
+            <h3 className={styles.chartTitle}>Sector × State Treemap</h3>
+            <p className={styles.chartSub}>Tender Volume by Sector and State — Area = Count</p>
+          </div>
+          <div className={styles.pill}>All States</div>
+        </div>
+        {treemapLoading ? <Shimmer h={320} /> : !treemapData?.length ? <Empty label="No treemap data" /> : (() => {
+          // Build nested structure: sector → states
+          const sectors: Record<string, {state: string; count: number}[]> = {};
+          (treemapData ?? []).forEach(d => {
+            if (!sectors[d.sector]) sectors[d.sector] = [];
+            sectors[d.sector].push({ state: d.state, count: d.count });
+          });
+          const total = (treemapData ?? []).reduce((s, d) => s + d.count, 0);
+
+          return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, minHeight: 300 }}>
+              {Object.entries(sectors).map(([sec, states]) => {
+                const secTotal = states.reduce((s, d) => s + d.count, 0);
+                const secPct   = total > 0 ? (secTotal / total) * 100 : 0;
+                return (
+                  <div key={sec} style={{
+                    flex: `${secPct} 0 ${Math.max(secPct, 8)}%`,
+                    minWidth: 60,
+                    background: sectorColor(sec) + '15',
+                    border: `2px solid ${sectorColor(sec)}40`,
+                    borderRadius: 10,
+                    padding: 8,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: sectorColor(sec), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {getSectorLabel(sec)}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)' }}>{secTotal}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                      {states.sort((a, b) => b.count - a.count).slice(0, 6).map(st => (
+                        <div key={st.state} title={`${st.state}: ${st.count}`}
+                          style={{
+                            background: sectorColor(sec) + '30',
+                            border: `1px solid ${sectorColor(sec)}50`,
+                            borderRadius: 4,
+                            padding: '2px 5px',
+                            fontSize: 10,
+                            color: 'var(--text-secondary)',
+                            display: 'flex',
+                            gap: 3,
+                            alignItems: 'center',
+                          }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{st.state}</span>
+                          <span>{st.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Row 7: Top Sectors by Value + Top Departments */}
