@@ -271,3 +271,22 @@ async def delete_job(
         "job_id":           job_id,
         "tenders_removed":  tenders_deleted,
     }
+
+
+# ── POST /ingestion/run-now ───────────────────────────────────────────────────
+@router.post("/run-now", status_code=200)
+async def trigger_ingestion_now(
+    current_user=Depends(get_current_user),
+):
+    """
+    Manually trigger the full ingestion job right now —
+    same as the scheduler: AusTender + QLD + TendersNet URLs.
+    """
+    from app.ingestion.scheduler import run_ingestion
+    logger.info(f"Manual ingestion triggered by {current_user.email}")
+    try:
+        await run_ingestion()
+        return {"status": "ok", "message": "Ingestion complete — check logs for details"}
+    except Exception as e:
+        logger.error(f"Manual ingestion failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
