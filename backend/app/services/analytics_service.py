@@ -589,3 +589,75 @@ async def get_value_scatter(db: AsyncSession) -> list[dict]:
         }
         for r in rows
     ]
+
+
+async def get_sector_treemap(db: AsyncSession) -> list[dict]:
+    """
+    Treemap data: tender count grouped by sector then state.
+    Returns flat list with sector/state/count for frontend to nest.
+    """
+    from sqlalchemy import text
+    result = await db.execute(text("""
+        SELECT
+            sector,
+            state,
+            COUNT(id) AS count
+        FROM tenders
+        WHERE sector IN (
+            'cleaning','facility_management','construction',
+            'it_services','healthcare','transportation','utilities','other'
+        )
+        AND state IS NOT NULL
+        AND state NOT IN ('Unknown', '')
+        GROUP BY sector, state
+        ORDER BY sector, count DESC
+    """))
+    rows = result.all()
+    return [{"sector": r.sector, "state": r.state, "count": r.count} for r in rows]
+
+
+async def get_sector_status_breakdown(db: AsyncSession) -> list[dict]:
+    """
+    For each sector: count of open, closed, upcoming tenders.
+    Used for the radial/ring completion chart.
+    """
+    from sqlalchemy import text
+    result = await db.execute(text("""
+        SELECT
+            sector,
+            status,
+            COUNT(id) AS count
+        FROM tenders
+        WHERE sector IN (
+            'cleaning','facility_management','construction',
+            'it_services','healthcare','transportation','utilities','other'
+        )
+        AND status IS NOT NULL
+        GROUP BY sector, status
+        ORDER BY sector, status
+    """))
+    rows = result.all()
+
+    # Pivot into [{sector, open, closed, upcoming, total}]
+    from collections import defaultdict
+    sectors: dict = defaultdict(lambda: {"open": 0, "closed": 0, "upcoming": 0})
+    for r in rows:
+        if r.status in ("open", "active"):
+            sectors[r.sector]["open"] += r.count
+        elif r.status == "closed":
+            sectors[r.sector]["closed"] += r.count
+        elif r.status == "upcoming":
+            sectors[r.sector]["upcoming"] += r.count
+
+    result_list = []
+    for sec, counts in sectors.items():
+        total = counts["open"] + counts["closed"] + counts["upcoming"]
+        result_list.append({
+            "sector":   sec,
+            "open":     counts["open"],
+            "closed":   counts["closed"],
+            "upcoming": counts["upcoming"],
+            "total":    total,
+        })
+
+    return sorted(result_list, key=lambda x: x["total"], reverse=True)
