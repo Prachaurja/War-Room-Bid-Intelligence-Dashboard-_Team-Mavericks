@@ -254,3 +254,35 @@ export function useValueScatter() {
     retry: 1,
   });
 }
+
+export interface TreemapItem {
+  sector: string;
+  state:  string;
+  count:  number;
+}
+
+export interface SectorStatusItem {
+  sector:   string;
+  open:     number;
+  closed:   number;
+  upcoming: number;
+  total:    number;
+}
+
+export function useSectorTreemap() {
+  return useQuery<TreemapItem[]>({
+    queryKey: ['analytics', 'sector-treemap'],
+    queryFn:  async () => (await apiClient.get('/analytics/sector-treemap')).data,
+    staleTime: STALE,
+    retry: 1,
+  });
+}
+
+export function useSectorStatusBreakdown() {
+  return useQuery<SectorStatusItem[]>({
+    queryKey: ['analytics', 'sector-status-breakdown'],
+    queryFn:  async () => (await apiClient.get('/analytics/sector-status-breakdown')).data,
+    staleTime: STALE,
+    retry: 1,
+  });
+}
