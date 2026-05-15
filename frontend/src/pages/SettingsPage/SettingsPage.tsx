@@ -165,7 +165,7 @@ function PasswordVerifyModal({ onConfirm, onCancel, loading, error }: PasswordMo
         <div className={styles.modalHeader}>
           <div>
             <h3 className={styles.modalTitle}>Verify Your Password</h3>
-            <p className={styles.modalSub}>Enter your password to view recovery codes</p>
+            <p className={styles.modalSub}>Enter Your Password to View Recovery Codes</p>
           </div>
           <button className={styles.modalClose} onClick={onCancel}><X size={16} /></button>
         </div>
@@ -796,7 +796,7 @@ export default function SettingsPage() {
                             {profileSaving ? <><RefreshCw size={13} className={styles.spinning} /> Saving…</> : <><Check size={13} /> Save Profile</>}
                           </button>
                         </div>
-                        <div className={styles.metaLine}><span className={styles.metaBadge}>Role: {user?.role ?? 'analyst'}</span><span>Signed in as {user?.email ?? 'unknown'}</span></div>
+                        <div className={styles.metaLine}><span className={styles.metaBadge}>Role: {user?.role ?? 'analyst'}</span><span>Signed in as <b>{user?.email ?? 'unknown'}</b></span></div>
                       </div>
                     </div>
                   </div>
@@ -869,9 +869,9 @@ export default function SettingsPage() {
                 <>
                   <div className={styles.sectionHeader}><Trash2 size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Data & Privacy</h3><p className={styles.sectionSub}>Manage Your Local Data and Preferences</p></div></div>
                   {[
-                    { title: 'Clear Trend History',   sub: 'Removes the 30-day stats history used for change indicators on the Overview page.', icon: Clock,     btn: 'Clear History', color: '#F59E0B', action: clearHistory  },
-                    { title: 'Reset All Preferences', sub: 'Resets tender filters, display preferences to defaults. Page will reload.',         icon: RefreshCw, btn: 'Reset',         color: '#3B82F6', action: resetAllPrefs },
-                    { title: 'Export My Data',        sub: 'Download a JSON file of your settings, preferences, and profile.',                  icon: Download,  btn: 'Export',        color: '#10B981', action: exportData    },
+                    { title: 'Clear Trend History',   sub: 'Removes the 30-Day Stats History Used for Change Indicators on the Overview Page.', icon: Clock,     btn: 'Clear History', color: '#F59E0B', action: clearHistory  },
+                    { title: 'Reset All Preferences', sub: 'Resets Tender Filters, Display Preferences to Defaults. Page Will Reload.',         icon: RefreshCw, btn: 'Reset',         color: '#3B82F6', action: resetAllPrefs },
+                    { title: 'Export My Data',        sub: 'Download a JSON File of Your Settings, Preferences, and Profile.',                  icon: Download,  btn: 'Export',        color: '#10B981', action: exportData    },
                   ].map(item => (
                     <div key={item.title} className={styles.card}>
                       <div className={styles.actionRow}>
@@ -929,7 +929,7 @@ export default function SettingsPage() {
                       </div>
                       <div className={styles.actionInfo}>
                         <p className={styles.actionTitle}>Two-Factor Authentication</p>
-                        <p className={styles.actionSub}>{totpEnabled ? '2FA is active. Your account is protected with an authenticator app.' : 'Add an extra layer of security with an authenticator app.'}</p>
+                        <p className={styles.actionSub}>{totpEnabled ? '2FA is Active. Your Account is Protected with an Authenticator App.' : 'Add an Extra Layer of Security with an Authenticator App.'}</p>
                       </div>
                       {totpEnabled ? (
                         <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }} onClick={handle2faDisable} disabled={totpLoading}>
@@ -988,10 +988,10 @@ export default function SettingsPage() {
                           <p className={styles.cardSectionTitle}><KeyRound size={14} /> Recovery Codes</p>
                           <p className={styles.cardSectionSub}>
                             {showRecoveryCodes
-                              ? 'Save these codes somewhere safe — each can only be used once'
+                              ? 'Save These Codes Somewhere Safe — Each Can Only Be Used Once'
                               : remainingCodes < 4
-                                ? `⚠️ Only ${remainingCodes} code${remainingCodes === 1 ? '' : 's'} remaining — regenerate soon`
-                                : `${remainingCodes} codes available — verify your password to view`}
+                                ? `⚠️ Only ${remainingCodes} Code${remainingCodes === 1 ? '' : 's'} Remaining — Regenerate Soon`
+                                : `${remainingCodes} Codes Available — Verify Your Password to View`}
                           </p>
                         </div>
                         <div className={styles.recoveryActions}>
@@ -1075,7 +1075,7 @@ export default function SettingsPage() {
                     <div className={styles.cardHeaderRow}>
                       <div>
                         <p className={styles.cardSectionTitle}><MonitorSmartphone size={14} /> Active Sessions</p>
-                        <p className={styles.cardSectionSub}>Devices currently signed in to your account</p>
+                        <p className={styles.cardSectionSub}>Devices Currently Signed in to Your Account</p>
                       </div>
                       {sessions.filter(s => !s.is_current).length > 0 && (
                         <button className={styles.btnOutline} style={{ borderColor: '#EF444450', color: '#EF4444' }} onClick={revokeAllSessions}>Revoke All Others</button>
@@ -1104,7 +1104,7 @@ export default function SettingsPage() {
                   </div>
                   <div className={styles.card}>
                     <div className={styles.cardHeaderRow}>
-                      <div><p className={styles.cardSectionTitle}><KeyRound size={14} /> API Key Management</p><p className={styles.cardSectionSub}>Generate keys for external integrations</p></div>
+                      <div><p className={styles.cardSectionTitle}><KeyRound size={14} /> API Key Management</p><p className={styles.cardSectionSub}>Generate Keys for External Integrations</p></div>
                     </div>
                     {createdKey && (
                       <div className={styles.createdKeyBanner}>
@@ -1173,11 +1173,8 @@ export default function SettingsPage() {
                       </>
                     )}
                   </div>
-
-
                 </>
               )}
-
             </motion.div>
           </AnimatePresence>
         </div>
