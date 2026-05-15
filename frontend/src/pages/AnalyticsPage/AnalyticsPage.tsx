@@ -518,9 +518,9 @@ export default function AnalyticsPage() {
                   </span>
                   {/* Mini stats */}
                   <div style={{ display: 'flex', gap: 6, fontSize: 10 }}>
-                    <span style={{ color: sectorColor(s.sector) }}>{s.open} open</span>
+                    <span style={{ color: sectorColor(s.sector) }}>{s.open} Open</span>
                     <span style={{ color: 'var(--text-dim)' }}>·</span>
-                    <span style={{ color: '#F59E0B' }}>{s.upcoming} up</span>
+                    <span style={{ color: '#F59E0B' }}>{s.upcoming} Upcoming</span>
                   </div>
                 </div>
               );
