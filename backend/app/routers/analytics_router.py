@@ -15,6 +15,8 @@ from app.services.analytics_service import (
     get_sector_state_heatmap,
     get_agency_frequency,
     get_value_scatter,
+    get_sector_treemap,
+    get_sector_status_breakdown,
     get_status_breakdown,
     get_closing_soon,
     get_value_distribution,
@@ -221,5 +223,29 @@ async def value_scatter(db: AsyncSession = Depends(get_db)):
     if cached:
         return cached
     result = await get_value_scatter(db)
+    await cache_set(cache_key, result, TTL_5_MIN)
+    return result
+
+
+@router.get("/sector-treemap")
+async def sector_treemap(db: AsyncSession = Depends(get_db)):
+    """Treemap data: tender count by sector and state."""
+    cache_key = "warroom:analytics:sector-treemap"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    result = await get_sector_treemap(db)
+    await cache_set(cache_key, result, TTL_5_MIN)
+    return result
+
+
+@router.get("/sector-status-breakdown")
+async def sector_status_breakdown(db: AsyncSession = Depends(get_db)):
+    """Open/closed/upcoming count per sector for radial chart."""
+    cache_key = "warroom:analytics:sector-status-breakdown"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    result = await get_sector_status_breakdown(db)
     await cache_set(cache_key, result, TTL_5_MIN)
     return result
