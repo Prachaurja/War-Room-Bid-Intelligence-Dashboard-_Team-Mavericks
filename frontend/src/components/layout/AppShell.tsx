@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useUIStore } from '../../store/ui.store';
 import { useBrowserAlertNotifications } from '../../hooks/useBrowserAlertNotifications';
@@ -8,7 +9,13 @@ import styles from './AppShell.module.css';
 export default function AppShell() {
   const { sidebarOpen } = useUIStore();
   const location = useLocation();
+  const contentRef = useRef<HTMLElement>(null);
   useBrowserAlertNotifications();
+
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname]);
 
   return (
     <div className={styles.shell}>
@@ -18,7 +25,7 @@ export default function AppShell() {
         style={{ marginLeft: sidebarOpen ? 'var(--sidebar-width)' : '0' }}
       >
         <TopBar pathname={location.pathname} />
-        <main className={styles.content}>
+        <main className={styles.content} ref={contentRef}>
           <Outlet />
         </main>
       </div>
