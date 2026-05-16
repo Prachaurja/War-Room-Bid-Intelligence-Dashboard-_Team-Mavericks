@@ -29,7 +29,8 @@ const SOURCE_CONFIG: Record<string, {
   wa_tenders:  { label: 'WA Tenders',  color: '#EC4899', bg: 'rgba(236,72,153,0.1)',  icon: Database, desc: 'Western Australian Tenders' },
   sa_tenders:  { label: 'SA Tenders',  color: '#10B981', bg: 'rgba(16,185,129,0.1)',  icon: Database, desc: 'South Australian Tenders' },
   tas_tenders: { label: 'TAS Tenders', color: '#84CC16', bg: 'rgba(132,204,22,0.1)',  icon: Database, desc: 'Tasmanian Government Tenders' },
-  manual:      { label: 'Manual',      color: '#6B7280', bg: 'rgba(107,114,128,0.1)',  icon: Database, desc: 'Manually Added Opportunities' },
+  tenders_act: { label: 'Tenders ACT', color: '#F97316', bg: 'rgba(249,115,22,0.1)',  icon: Database, desc: 'Australian Capital Territory Tenders' },
+  manual:      { label: 'Manual',      color: '#6B7280', bg: 'rgba(107,114,128,0.1)', icon: Database, desc: 'Manually Added Opportunities' },
 };
 
 const SECTOR_COLORS: Record<string, string> = {

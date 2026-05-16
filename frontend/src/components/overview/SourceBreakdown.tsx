@@ -9,6 +9,7 @@ const SOURCE_META: Record<string, { label: string; color: string }> = {
   // Scraped / API sources
   austender:            { label: 'AusTender',                    color: '#7C3AED' },
   tenders_net:          { label: 'Tenders.Net',                  color: '#10B981' },
+  tendersnet:            { label: 'Tenders.Net',                 color: '#10B981' },
   nsw_etender:          { label: 'NSW eTender',                  color: '#3B82F6' },
   qld_tenders:          { label: 'QLD Tenders',                  color: '#F59E0B' },
   // Upload-based sources (keys match source_config.py)
@@ -16,8 +17,9 @@ const SOURCE_META: Record<string, { label: string; color: string }> = {
   sa_tenders:           { label: 'SA Tenders',                   color: '#EF4444' },
   wa_tenders:           { label: 'WA Tenders',                   color: '#10B981' },
   qtenders:             { label: 'QTenders',                     color: '#F59E0B' },
-  nt_tenders:           { label: 'Quotations and Tenders Online', color: '#F97316' },
+  nt_tenders:           { label: 'Quotations and Tenders Online',color: '#F97316' },
   tas_tenders:          { label: 'Tasmanian Government Tenders', color: '#8B5CF6' },
+  tenders_act:          { label: 'Tenders ACT',                  color: '#EC4899' },
   // Legacy / manual
   manual:               { label: 'Manual Upload',                color: '#6B7280' },
 };

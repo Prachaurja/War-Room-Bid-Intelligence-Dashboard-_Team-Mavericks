@@ -255,7 +255,7 @@ export default function SettingsPage() {
       const src = ev.target?.result as string;
       setAvatarSrc(src);
       localStorage.setItem(avatarKey, src);
-      toast.success('Avatar ready — click Save Profile to apply');
+      toast.success('Avatar Ready — Click Save Profile to Apply');
     };
     reader.readAsDataURL(file);
   };
@@ -1052,7 +1052,7 @@ export default function SettingsPage() {
                             </div>
                             <button
                               className={styles.copyAllBtn}
-                              onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); toast.success('All codes copied'); }}
+                              onClick={() => { navigator.clipboard.writeText(recoveryCodes.join('\n')); toast.success('All Codes Copied'); }}
                             >
                               <Copy size={13} /> Copy All Codes
                             </button>
@@ -1062,7 +1062,7 @@ export default function SettingsPage() {
                                 checked={savedConfirmed}
                                 onChange={e => setSavedConfirmed(e.target.checked)}
                               />
-                              <span>{savedConfirmed ? '✓ Saved' : "I've saved these recovery codes in a safe place"}</span>
+                              <span>{savedConfirmed ? '✓ Saved' : "I've Saved These Recovery Codes in a Safe Place"}</span>
                             </label>
                           </motion.div>
                         )}

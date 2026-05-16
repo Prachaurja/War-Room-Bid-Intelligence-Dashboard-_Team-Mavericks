@@ -77,7 +77,6 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  overflow: visible;
 }
 
 .uploadCardHeader {
@@ -264,19 +263,6 @@
   overflow: hidden;
 }
 
-.noticeBanner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  background: rgba(245,158,11,0.1);
-  border: 1px solid rgba(245,158,11,0.25);
-  color: #F59E0B;
-  font-size: 12px;
-  font-weight: 500;
-}
-
 /* ── Upload button ── */
 .uploadBtn {
   display: flex;
@@ -353,14 +339,6 @@
   transition: var(--transition-fast);
 }
 .refreshBtn:hover { background: var(--bg-elevated); border-color: var(--border-hover); }
-.refreshBtn:disabled {
-  opacity: 0.72;
-  cursor: wait;
-}
-
-.refreshIconSpin {
-  animation: spin 0.8s linear infinite;
-}
 
 /* ── Loading skeleton ── */
 .loadingList { display: flex; flex-direction: column; gap: 10px; }
@@ -502,11 +480,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.jobDeleteBtn:hover {
-  color: #EF4444;
-  background: rgba(239,68,68,0.12);
-  border-color: rgba(239,68,68,0.28);
-}
+.jobDeleteBtn:hover { color: #F87171; background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.2); }
 .jobDeleteBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Job details (expanded) ── */
@@ -644,7 +618,6 @@
 /* Source dropdown wrapper */
 .sourceDropWrap {
   position: relative;
-  z-index: 30;
 }
 
 /* Dropdown trigger button */
@@ -711,20 +684,14 @@
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: #161B22;
-  border: 1px solid var(--card-border);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg), 0 16px 40px rgba(0,0,0,0.32);
-  z-index: 200;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  z-index: 100;
   overflow: hidden;
-  max-height: min(360px, 50vh);
+  max-height: 360px;
   overflow-y: auto;
-}
-
-:global([data-theme='light']) .sourceDropMenu {
-  background: #FFFFFF;
-  border-color: rgba(226,232,240,0.95);
-  box-shadow: 0 18px 42px rgba(15,23,42,0.16);
 }
 
 .sourceDropItem {
@@ -740,20 +707,12 @@
   font-family: var(--font-sans);
   font-size: 13px;
   text-align: left;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.1s;
   border-bottom: 1px solid var(--border);
 }
 .sourceDropItem:last-child { border-bottom: none; }
-.sourceDropItem:hover { background: rgba(124,58,237,0.10); }
-.sourceDropItemActive { background: rgba(124,58,237,0.16); }
-
-:global([data-theme='light']) .sourceDropItem:hover {
-  background: rgba(124,58,237,0.08);
-}
-
-:global([data-theme='light']) .sourceDropItemActive {
-  background: rgba(124,58,237,0.12);
-}
+.sourceDropItem:hover { background: var(--bg-elevated); }
+.sourceDropItemActive { background: var(--bg-overlay); }
 
 .sourceDropItemLabel {
   font-weight: 500;
@@ -783,186 +742,380 @@
   font-weight: 600;
 }
 
-.confirmOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(2,6,23,0.46);
-  backdrop-filter: blur(6px);
+
+/* Source dropdown wrapper */
+.sourceDropWrap {
+  position: relative;
 }
 
-:global([data-theme='light']) .confirmOverlay {
-  background: rgba(15,23,42,0.24);
-}
-
-.confirmDialog {
-  width: min(100%, 560px);
-  overflow: hidden;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--modal-border);
-  background: #161B22;
-  box-shadow: var(--modal-shadow);
-}
-
-:global([data-theme='light']) .confirmDialog {
-  background: #FFFFFF;
-}
-
-.confirmHeader {
+/* Dropdown trigger button */
+.sourceDrop {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px 18px 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.confirmTitleBlock {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.confirmIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: #DC2626;
-  background: rgba(220,38,38,0.14);
-  border: 1px solid rgba(220,38,38,0.28);
-}
-
-.confirmTitle {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.1;
-}
-
-.confirmSub {
-  margin-top: 2px;
-  color: var(--text-dim);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.confirmClose {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  color: var(--text-dim);
-  background: transparent;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition-fast);
-}
-
-.confirmClose:hover:not(:disabled) {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
-  border-color: var(--border);
-}
-
-.confirmBody {
-  display: grid;
-  gap: 7px;
-  padding: 8px 18px 14px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.confirmBodyLabel {
-  color: var(--text-dim);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.confirmJobName {
-  display: block;
-  padding: 9px 11px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.confirmBodyText {
-  margin: 0;
-  color: #ff4e4e;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.confirmActions {
-  display: flex;
-  justify-content: flex-end;
   gap: 10px;
-  padding: 12px 18px 14px;
-}
-
-.confirmCancel,
-.confirmDelete {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 36px;
-  padding: 0 16px;
-  border-radius: var(--radius-md);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.confirmCancel {
-  color: var(--text-secondary);
+  padding: 10px 14px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-align: left;
 }
-
-.confirmCancel:hover:not(:disabled) {
-  color: var(--text-primary);
+.sourceDrop:hover {
+  border-color: var(--border-hover);
+}
+.sourceDropOpen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.sourceDropSelected {
   border-color: var(--border-hover);
 }
 
-.confirmDelete {
+.sourceDropValue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.sourceDropLabel {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.sourceDropScope {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sourceDropPlaceholder {
+  color: var(--text-dim);
+}
+.sourceDropChevron {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* Dropdown menu */
+.sourceDropMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  z-index: 100;
+  overflow: hidden;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.sourceDropItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: left;
+  transition: background 0.1s;
+  border-bottom: 1px solid var(--border);
+}
+.sourceDropItem:last-child { border-bottom: none; }
+.sourceDropItem:hover { background: var(--bg-elevated); }
+.sourceDropItemActive { background: var(--bg-overlay); }
+
+.sourceDropItemLabel {
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+.sourceDropItemScope {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Scope badge on job cards */
+.jobScopePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+
+/* Shared backdrop (reuse from SettingsPage pattern) */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+/* Delete modal card */
+.deleteModalCard {
+  background: var(--bg-card);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(239,68,68,0.1);
+  overflow: hidden;
+}
+
+.deleteModalHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.deleteModalIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #EF4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.deleteModalTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.deleteModalSub {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+.deleteModalSub strong { color: var(--text-primary); }
+
+.deleteModalClose {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.deleteModalClose:hover { color: var(--text-secondary); }
+
+/* Warning banner inside modal */
+.deleteModalWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  margin: 14px 20px 0;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: #F59E0B;
+  line-height: 1.5;
+}
+
+.deleteModalBody {
+  padding: 16px 20px;
+}
+
+.deleteModalLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.deleteModalInputWrap {
+  position: relative;
+}
+
+.deleteModalInput {
+  width: 100%;
+  padding: 10px 38px 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.deleteModalInput:focus {
+  outline: none;
+  border-color: #EF4444;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+.deleteModalInput::placeholder { color: var(--text-dim); }
+
+.deleteModalEye {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.15s;
+}
+.deleteModalEye:hover { color: var(--text-secondary); }
+
+.deleteModalError {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #EF4444;
+  margin-top: 6px;
+}
+
+.deleteModalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.cancelBtn {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.cancelBtn:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+.cancelBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.confirmDeleteBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  background: #EF4444;
+  border: none;
   color: #fff;
-  background: linear-gradient(135deg, #ff0000, #ff4000);
-  border: 1px solid rgba(220,38,38,0.62);
-  box-shadow: 0 10px 24px rgba(220,38,38,0.26);
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.confirmDeleteBtn:hover:not(:disabled) { background: #DC2626; }
+.confirmDeleteBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Merge-safe overrides for upload feedback and dropdown layering */
+.uploadCard {
+  overflow: visible;
 }
 
-.confirmDelete:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg, #ff0000, ##ff4000);
-  box-shadow: 0 14px 28px rgba(220,38,38,0.34);
+.noticeBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #60A5FA;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
-.confirmCancel:disabled,
-.confirmDelete:disabled,
-.confirmClose:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+.refreshBtn:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.refreshIconSpin {
+  animation: spin 0.9s linear infinite;
+}
+
+.sourceDropWrap {
+  z-index: 30;
+}
+
+.sourceDropMenu {
+  background: #161B22;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-lg), 0 16px 40px rgba(0, 0, 0, 0.32);
+  z-index: 200;
+  max-height: min(360px, 50vh);
+}
+
+.sourceDropItem {
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.sourceDropItem:hover {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.sourceDropItemActive {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+:global([data-theme='light']) .sourceDropMenu {
+  background: #FFFFFF;
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
 }
