@@ -127,6 +127,12 @@
 }
 @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
 
+.pageSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 /* ── Settings sidebar nav ── */
 .settingsNav {
   background: var(--card-bg);
@@ -201,6 +207,10 @@
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 0;
+}
+
+.section > .sectionHeader {
+  display: none;
 }
 .sectionIcon  { color: var(--accent-lighter); flex-shrink: 0; margin-top: 2px; }
 .sectionTitle { font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }

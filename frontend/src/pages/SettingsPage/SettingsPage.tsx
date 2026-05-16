@@ -47,6 +47,16 @@ const SECTIONS = [
 type SectionId = typeof SECTIONS[number]['id'];
 const GROUPS = ['Account', 'Preferences', 'System'];
 
+const SECTION_SUBTITLES: Record<SectionId, string> = {
+  profile: 'Edit the Profile Shown Across the Dashboard',
+  security: 'Account Security and Session Management',
+  team: 'Manage Team Members and Roles',
+  appearance: 'Choose a Theme and Preview it Before Applying',
+  notification: 'Control How and When Alerts Reach You',
+  'tender-prefs': 'Default Filters Applied When Opening the Tenders Page',
+  'data-privacy': 'Manage Your Local Data and Preferences',
+};
+
 function getPref<T>(key: string, fallback: T): T {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
   catch { return fallback; }
@@ -227,6 +237,7 @@ export default function SettingsPage() {
   const { themeMode, setThemeMode } = useUIStore();
   const { prefs, setPrefs }         = useNotificationPreferences();
   const [activeSection, setActive]  = useState<SectionId>('profile');
+  const activeSectionMeta = SECTIONS.find(section => section.id === activeSection) ?? SECTIONS[0];
 
   const avatarKey = `wr_avatar_${user?.id ?? 'default'}`;
 
@@ -733,6 +744,14 @@ export default function SettingsPage() {
           />
         )}
       </AnimatePresence>
+
+      <div className={styles.pageSectionHeader}>
+        <activeSectionMeta.icon size={18} className={styles.sectionIcon} />
+        <div>
+          <h3 className={styles.sectionTitle}>{activeSectionMeta.label}</h3>
+          <p className={styles.sectionSub}>{SECTION_SUBTITLES[activeSection]}</p>
+        </div>
+      </div>
 
       <div className={styles.layout}>
 
