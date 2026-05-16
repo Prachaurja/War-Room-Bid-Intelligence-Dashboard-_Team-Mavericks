@@ -140,6 +140,10 @@
   margin-bottom: 20px;
 }
 
+.chartHeader > div:first-child {
+  min-width: 0;
+}
+
 .chartTitle {
   font-size: 15px;
   font-weight: 600;
@@ -153,6 +157,10 @@
 }
 
 .pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   background: var(--bg-overlay);
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
@@ -160,7 +168,14 @@
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
+  line-height: 1;
   white-space: nowrap;
+  flex-shrink: 0;
+  width: max-content;
+  max-width: 100%;
+}
+
+.pill svg {
   flex-shrink: 0;
 }
 
@@ -373,4 +388,15 @@
   width: 200px; height: 200px;
   border-radius: 50%;
   margin: 20px auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer,
+  .kpiSkeleton {
+    animation: none;
+  }
+
+  .topBar {
+    transition: none;
+  }
 }
