@@ -637,13 +637,13 @@ export default function TendersPage() {
           (sum, k) => sum + (srcData[k]?.value ?? 0),
           0,
         );
-        return v > 0 ? formatCurrency(v) : 'Not disclosed';
+        return v > 0 ? formatCurrency(v) : 'Not Disclosed';
       }
-      return 'Not disclosed';
+      return 'Not Disclosed';
     }
     // No source selected — show total value for this card status
     const total = stats?.[card.valueKey] ?? 0;
-    return total > 0 ? formatCurrency(total) : 'Not disclosed';
+    return total > 0 ? formatCurrency(total) : 'Not Disclosed';
   };
 
   const activeCardDef = STATUS_CARDS.find((c) => c.id === activeTab)!;
