@@ -21,6 +21,8 @@ import { useDebounce } from '../../hooks/useDebounce';
 import TenderCard from '../../components/tenders/TenderCard';
 import TenderFilters, {
   type PageSize,
+  type SortDirection,
+  type TenderSortField,
   type YearMode,
 } from '../../components/tenders/TenderFilters';
 import TenderDetailModal from '../../components/tenders/TenderDetailModal';
@@ -91,6 +93,9 @@ async function fetchAllTenderPages(
 type Tab = 'active' | 'upcoming' | 'closed';
 type PageItem = number | 'dots-left' | 'dots-right';
 
+const DEFAULT_SORT_FIELD: TenderSortField = 'created_at';
+const DEFAULT_SORT_DIRECTION: SortDirection = 'desc';
+
 const STATUS_CARDS: {
   id: Tab;
   label: string;
@@ -142,6 +147,42 @@ const STATUS_CARDS: {
 ];
 
 const LEGACY_ACTIVE_STATUS = 'open';
+
+const csvEscape = (value: unknown) => {
+  const text = value == null ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
+function compareNullableString(a: string | null | undefined, b: string | null | undefined) {
+  return (a ?? '').localeCompare(b ?? '', undefined, { sensitivity: 'base' });
+}
+
+function compareNullableDate(a: string | null | undefined, b: string | null | undefined) {
+  const aTime = a ? new Date(a).getTime() : 0;
+  const bTime = b ? new Date(b).getTime() : 0;
+  return (Number.isNaN(aTime) ? 0 : aTime) - (Number.isNaN(bTime) ? 0 : bTime);
+}
+
+function sortTenders(
+  items: Tender[],
+  sortField: TenderSortField,
+  sortDirection: SortDirection,
+) {
+  const direction = sortDirection === 'asc' ? 1 : -1;
+
+  return [...items].sort((a, b) => {
+    let result = 0;
+
+    if (sortField === 'title') result = compareNullableString(a.title, b.title);
+    else if (sortField === 'agency') result = compareNullableString(a.agency, b.agency);
+    else if (sortField === 'published_date') result = compareNullableDate(a.published_date, b.published_date);
+    else if (sortField === 'close_date') result = compareNullableDate(a.close_date, b.close_date);
+    else if (sortField === 'contract_value') result = (a.contract_value ?? 0) - (b.contract_value ?? 0);
+    else result = compareNullableDate(a.created_at, b.created_at);
+
+    return result * direction;
+  });
+}
 
 const getVisiblePages = (
   currentPage: number,
@@ -206,9 +247,12 @@ export default function TendersPage() {
   const [year, setYear] = useState(urlYear);
   const [sourceName, setSourceName] = useState('');
   const [pageSize, setPageSize] = useState<PageSize>('15');
+  const [sortField, setSortField] = useState<TenderSortField>(DEFAULT_SORT_FIELD);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION);
   const [page, setPage] = useState(1);
   const [jumpPage, setJumpPage] = useState('1');
   const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const search = searchParams.get('search') ?? '';
   const setSearch = useCallback(
@@ -319,6 +363,14 @@ export default function TendersPage() {
     setPageSize(v);
     setPage(1);
   }, []);
+  const handleSortField = useCallback((v: TenderSortField) => {
+    setSortField(v);
+    setPage(1);
+  }, []);
+  const handleSortDirection = useCallback((v: SortDirection) => {
+    setSortDirection(v);
+    setPage(1);
+  }, []);
   const handleTab = useCallback((t: Tab) => {
     setActiveTab(t);
     setPage(1);
@@ -338,7 +390,9 @@ export default function TendersPage() {
 
   const hasYearFilter = Boolean(year);
   const pageSizeNumber = Number(pageSize);
-  const needsFullDataset = hasYearFilter;
+  const hasCustomSort =
+    sortField !== DEFAULT_SORT_FIELD || sortDirection !== DEFAULT_SORT_DIRECTION;
+  const needsFullDataset = hasYearFilter || hasCustomSort;
   const isActiveTab = activeTab === 'active';
 
   const filters = {
@@ -448,15 +502,20 @@ export default function TendersPage() {
     );
   }, [allYearTenders, needsFullDataset, rawTenders, year, yearMode]);
 
+  const sortedFilteredTenders = useMemo(
+    () => sortTenders(yearFilteredTenders, sortField, sortDirection),
+    [yearFilteredTenders, sortDirection, sortField],
+  );
+
   const tenders = needsFullDataset
-    ? yearFilteredTenders.slice(
+    ? sortedFilteredTenders.slice(
         (page - 1) * pageSizeNumber,
         page * pageSizeNumber,
       )
     : rawTenders;
 
   const total = needsFullDataset
-    ? yearFilteredTenders.length
+    ? sortedFilteredTenders.length
     : isActiveTab
       ? (data?.total ?? 0) + (legacyActiveStatusQuery.data?.total ?? 0)
       : (data?.total ?? 0);
@@ -507,8 +566,29 @@ export default function TendersPage() {
       (a, b) => Number(b) - Number(a),
     );
   }, [allYearTenders, yearMode]);
-  const exportCSV = () => {
-    if (!tenders.length) return;
+  const exportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const exportFilters = {
+        status: isActiveTab ? 'active' : activeTab,
+        sector: sector || undefined,
+        state: state || undefined,
+        source_name: sourceName || undefined,
+        search: debouncedSearch || undefined,
+      };
+      const exportItems = isActiveTab
+        ? mergeTenders(
+            await fetchAllTenderPages(exportFilters),
+            await fetchAllTenderPages({ ...exportFilters, status: LEGACY_ACTIVE_STATUS }),
+          )
+        : await fetchAllTenderPages(exportFilters);
+      const filteredItems = year
+        ? exportItems.filter((tender) => tenderCalendarYear(tender, yearMode) === year)
+        : exportItems;
+      const sortedItems = sortTenders(filteredItems, sortField, sortDirection);
+
+      if (!sortedItems.length) return;
+
     const headers = [
       'Title',
       'Agency',
@@ -519,9 +599,9 @@ export default function TendersPage() {
       'Status',
       'Source',
     ];
-    const rows = tenders.map((t) => [
-      `"${t.title.replace(/"/g, "'")}"`,
-      `"${t.agency.replace(/"/g, "'")}"`,
+    const rows = sortedItems.map((t) => [
+      csvEscape(t.title),
+      csvEscape(t.agency),
       t.sector ?? '',
       t.state ?? '',
       t.contract_value ?? '',
@@ -537,6 +617,9 @@ export default function TendersPage() {
     a.download = `warroom-tenders-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Compute displayed value for a card given selected source
@@ -575,9 +658,9 @@ export default function TendersPage() {
             Track and Manage Australian Government Tender Bids
           </p>
         </div>
-        <button className={styles.exportBtn} onClick={exportCSV}>
+        <button className={styles.exportBtn} onClick={exportCSV} disabled={isExporting}>
           <Download size={14} />
-          Export CSV
+          {isExporting ? 'Exporting...' : 'Export CSV'}
         </button>
       </div>
 
@@ -763,6 +846,8 @@ export default function TendersPage() {
         year={year}
         sourceName={sourceName}
         pageSize={pageSize}
+        sortField={sortField}
+        sortDirection={sortDirection}
         yearOptions={yearOptions}
         sourceOptions={sourceOptions}
         onSearch={handleSearch}
@@ -772,6 +857,8 @@ export default function TendersPage() {
         onYear={handleYear}
         onSource={handleSource}
         onPageSize={handlePageSize}
+        onSortField={handleSortField}
+        onSortDirection={handleSortDirection}
         onClear={handleClear}
         totalResults={total}
         loading={isListLoading}
