@@ -31,8 +31,8 @@
   .logoSub  { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
   .divider  { height: 1px; background: var(--border); margin-bottom: 24px; }
   .header   { margin-bottom: 22px; }
-  .title    { font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
-  .subtitle { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  .title    { text-align: center; font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
+  .subtitle { text-align: center;font-size: 13px; color: var(--text-muted); margin-top: 4px; }
   .form     { display: flex; flex-direction: column; gap: 14px; }
   .field    { display: flex; flex-direction: column; gap: 6px; }
   .label    { font-size: 12px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.02em; }
