@@ -280,12 +280,15 @@
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 @media (max-width: 1000px) {
   .bottomRow { grid-template-columns: 1fr; }
 }
-.feedWrap { min-width: 0; }
+.feedWrap {
+  min-width: 0;
+  display: flex;
+}
 .sideWrap {
   display: flex;
   flex-direction: column;
