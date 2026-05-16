@@ -42,3 +42,12 @@ passlib[bcrypt]
 bcrypt==4.0.1
 python-multipart
 bs4
+
+pyotp
+qrcode
+
+# ── XLSX ───────────────────────────────────────────────────
+xlsx
+xlsx --legacy-peer-deps
+react-is --legacy-peer-deps
+"pydantic[email]" --break-system-packages

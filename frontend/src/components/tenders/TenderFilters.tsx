@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowDown, ArrowUp, Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import styles from './TenderFilters.module.css';
 
 export type PageSize = '15' | '25' | '50' | '100';
 export type YearMode = 'close' | 'published';
+export type TenderSortField = 'created_at' | 'title' | 'published_date' | 'close_date' | 'contract_value' | 'agency';
+export type SortDirection = 'asc' | 'desc';
 
 const SECTORS = [
   { value: '', label: 'All Sectors' },
@@ -36,6 +39,18 @@ const PAGE_SIZES: Array<{ value: PageSize; label: string }> = [
   { value: '100', label: 'Show 100'},
 ];
 
+const SORT_FIELDS: Array<{ value: TenderSortField; label: string }> = [
+  { value: 'created_at', label: 'Default' },
+  { value: 'title', label: 'Tender Name' },
+  { value: 'published_date', label: 'Publish Date' },
+  { value: 'close_date', label: 'Close Date' },
+  { value: 'contract_value', label: 'Value' },
+  { value: 'agency', label: 'Agency' },
+];
+
+const defaultSortDirection = (field: TenderSortField): SortDirection =>
+  field === 'title' || field === 'agency' ? 'asc' : 'desc';
+
 const SOURCE_LABELS: Record<string, string> = {
   austender: 'AusTender',
   AusTender: 'AusTender',
@@ -64,6 +79,8 @@ interface TenderFiltersProps {
   year: string;
   sourceName: string;
   pageSize: PageSize;
+  sortField: TenderSortField;
+  sortDirection: SortDirection;
   yearOptions: string[];
   sourceOptions: string[];
   onSearch: (v: string) => void;
@@ -73,6 +90,8 @@ interface TenderFiltersProps {
   onYear: (v: string) => void;
   onSource: (v: string) => void;
   onPageSize: (v: PageSize) => void;
+  onSortField: (v: TenderSortField) => void;
+  onSortDirection: (v: SortDirection) => void;
   onClear: () => void;
   totalResults: number;
   loading: boolean;
@@ -86,6 +105,8 @@ export default function TenderFilters({
   year,
   sourceName,
   pageSize,
+  sortField,
+  sortDirection,
   yearOptions,
   sourceOptions,
   onSearch,
@@ -95,6 +116,8 @@ export default function TenderFilters({
   onYear,
   onSource,
   onPageSize,
+  onSortField,
+  onSortDirection,
   onClear,
   totalResults,
   loading,
@@ -102,6 +125,22 @@ export default function TenderFilters({
   const activeFilters = [search, sector, state, year, sourceName].filter(Boolean);
   const hasFilters = activeFilters.length > 0;
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
+  const selectedSortLabel = SORT_FIELDS.find((item) => item.value === sortField)?.label ?? 'Default';
+
+  useEffect(() => {
+    if (!sortOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!sortRef.current?.contains(event.target as Node)) {
+        setSortOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [sortOpen]);
 
   return (
     <div className={styles.wrap}>
@@ -132,6 +171,66 @@ export default function TenderFilters({
             {hasFilters && <span className={styles.activeCount}>{activeFilters.length}</span>}
             <ChevronDown size={14} className={filtersOpen ? styles.chevronOpen : ''} />
           </button>
+          <div className={styles.sortWrap} ref={sortRef}>
+            <button
+              type="button"
+              className={styles.sortMenuBtn}
+              onClick={() => setSortOpen((open) => !open)}
+              aria-expanded={sortOpen}
+            >
+              {sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+              <span>Sort</span>
+              <span className={styles.sortSummary}>{selectedSortLabel}</span>
+              <ChevronDown size={14} className={sortOpen ? styles.chevronOpen : ''} />
+            </button>
+
+            <AnimatePresence initial={false}>
+              {sortOpen && (
+                <motion.div
+                  className={styles.sortPanel}
+                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={{ duration: 0.14, ease: 'easeOut' }}
+                >
+                  <select
+                    className={styles.sortSelect}
+                    value={sortField}
+                    onChange={(event) => {
+                      const nextField = event.target.value as TenderSortField;
+                      onSortField(nextField);
+                      onSortDirection(defaultSortDirection(nextField));
+                    }}
+                    aria-label="Sort tenders by"
+                  >
+                    {SORT_FIELDS.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                  <div className={styles.sortDirectionGroup} aria-label="Sort direction">
+                    <button
+                      type="button"
+                      title="Ascending"
+                      className={`${styles.sortDirectionBtn} ${sortDirection === 'asc' ? styles.sortDirectionActive : ''}`}
+                      onClick={() => onSortDirection('asc')}
+                    >
+                      <ArrowUp size={15} />
+                      <span>Asc</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Descending"
+                      className={`${styles.sortDirectionBtn} ${sortDirection === 'desc' ? styles.sortDirectionActive : ''}`}
+                      onClick={() => onSortDirection('desc')}
+                    >
+                      <ArrowDown size={15} />
+                      <span>Desc</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <select
             className={styles.pageSizeSelect}
             value={pageSize}
@@ -157,63 +256,76 @@ export default function TenderFilters({
         </div>
       </div>
 
-      {filtersOpen && (
-        <div className={styles.menuPanel}>
-          <div className={styles.controls}>
-            <select
-              className={styles.select}
-              value={sector}
-              onChange={(event) => onSector(event.target.value)}
+      <AnimatePresence initial={false}>
+        {filtersOpen && (
+          <motion.div
+            className={styles.menuPanel}
+            initial={{ maxHeight: 0, opacity: 0, scaleY: 0.96, y: -4 }}
+            animate={{ maxHeight: 140, opacity: 1, scaleY: 1, y: 0 }}
+            exit={{ maxHeight: 0, opacity: 0, scaleY: 0.98, y: -4 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+          >
+            <motion.div
+              className={styles.controls}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
             >
-              {SECTORS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+              <select
+                className={styles.select}
+                value={sector}
+                onChange={(event) => onSector(event.target.value)}
+              >
+                {SECTORS.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
 
-            <select
-              className={styles.select}
-              value={state}
-              onChange={(event) => onState(event.target.value)}
-            >
-              {STATES.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+              <select
+                className={styles.select}
+                value={state}
+                onChange={(event) => onState(event.target.value)}
+              >
+                {STATES.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
 
-            <select
-              className={styles.select}
-              value={yearMode}
-              onChange={(event) => onYearMode(event.target.value as YearMode)}
-            >
-              <option value="close">Close Year</option>
-              <option value="published">Published Year</option>
-            </select>
+              <select
+                className={styles.select}
+                value={yearMode}
+                onChange={(event) => onYearMode(event.target.value as YearMode)}
+              >
+                <option value="close">Close Year</option>
+                <option value="published">Published Year</option>
+              </select>
 
-            <select
-              className={styles.select}
-              value={year}
-              onChange={(event) => onYear(event.target.value)}
-            >
-              <option value="">All Years</option>
-              {yearOptions.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
+              <select
+                className={styles.select}
+                value={year}
+                onChange={(event) => onYear(event.target.value)}
+              >
+                <option value="">All Years</option>
+                {yearOptions.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
 
-            <select
-              className={styles.select}
-              value={sourceName}
-              onChange={(event) => onSource(event.target.value)}
-            >
-              <option value="">All Sources</option>
-              {sourceOptions.map((item) => (
-                <option key={item} value={item}>{sourceLabel(item)}</option>
-              ))}
-            </select>
-
-          </div>
-        </div>
-      )}
+              <select
+                className={styles.select}
+                value={sourceName}
+                onChange={(event) => onSource(event.target.value)}
+              >
+                <option value="">All Sources</option>
+                {sourceOptions.map((item) => (
+                  <option key={item} value={item}>{sourceLabel(item)}</option>
+                ))}
+              </select>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

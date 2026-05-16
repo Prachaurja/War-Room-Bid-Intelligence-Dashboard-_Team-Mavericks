@@ -234,7 +234,7 @@ export default function OverviewPage() {
             className={styles.miniCard}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ duration: 0.25, delay: 0.08 }}
           >
             <div className={styles.miniHeader}>
               <TrendingUp size={14} className={styles.miniIcon} />
