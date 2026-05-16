@@ -621,7 +621,6 @@ export default function DataSourcesPage() {
                         onClick={() => { setDeleteTarget(job); setDeleteError(''); }}
                         title="Delete (password required)"
                       >
-                        <Lock size={11} style={{ marginRight: 2 }} />
                         <Trash2 size={13} />
                       </button>
                     </div>

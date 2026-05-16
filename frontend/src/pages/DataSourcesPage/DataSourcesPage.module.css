@@ -875,8 +875,9 @@
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
+  background: var(--modal-overlay);
+  background-image: var(--modal-veil);
+  backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -886,12 +887,12 @@
 
 /* Delete modal card */
 .deleteModalCard {
-  background: var(--bg-card);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--bg-elevated));
+  border: 1px solid var(--modal-border);
   border-radius: var(--radius-xl);
   width: 100%;
   max-width: 440px;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(239,68,68,0.1);
+  box-shadow: var(--modal-shadow), 0 0 0 1px rgba(239,68,68,0.08);
   overflow: hidden;
 }
 
@@ -1024,7 +1025,7 @@
   gap: 10px;
   padding: 14px 20px;
   border-top: 1px solid var(--border);
-  background: var(--bg-elevated);
+  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
 }
 
 .cancelBtn {
