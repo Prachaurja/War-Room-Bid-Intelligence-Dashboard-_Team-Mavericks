@@ -920,7 +920,7 @@ export default function AnalyticsPage() {
                   }}>
                     <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 4px' }}>{String(month.month)}</p>
                     <p style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{total}</p>
-                    <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '2px 0 0' }}>tenders closing</p>
+                    <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '2px 0 0' }}>Tenders Closing</p>
                   </div>
                 );
               })}
