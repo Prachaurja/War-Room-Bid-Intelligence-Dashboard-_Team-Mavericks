@@ -514,15 +514,18 @@ export default function TendersPage() {
       )
     : rawTenders;
 
+  const backendTotal = isActiveTab
+    ? (data?.total ?? 0) + (legacyActiveStatusQuery.data?.total ?? 0)
+    : (data?.total ?? 0);
   const total = needsFullDataset
-    ? sortedFilteredTenders.length
-    : isActiveTab
-      ? (data?.total ?? 0) + (legacyActiveStatusQuery.data?.total ?? 0)
-      : (data?.total ?? 0);
+    ? hasYearFilter
+      ? sortedFilteredTenders.length
+      : backendTotal
+    : backendTotal;
   const totalPages = needsFullDataset
     ? Math.max(1, Math.ceil(total / pageSizeNumber))
     : isActiveTab
-      ? Math.max(1, Math.ceil(total / pageSizeNumber))
+      ? Math.max(1, Math.ceil(backendTotal / pageSizeNumber))
       : (data?.total_pages ?? 1);
   const visiblePages = useMemo(
     () => getVisiblePages(page, totalPages),
