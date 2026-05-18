@@ -69,6 +69,34 @@ def _infer_sector(text: str) -> str:
     return "other"
 
 
+def _correct_status(result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Override source-provided status with date-based logic.
+
+    Source portals (WA Tenders, QLD, SA etc.) often label all exported
+    records as 'closed' even when close_date is in the future.
+    This corrects that by checking close_date vs now:
+
+      close_date > now  -> 'open'
+      close_date <= now -> 'closed'
+      no close_date     -> keep whatever the source said (or 'open')
+    """
+    now        = datetime.now(timezone.utc)
+    close_date = result.get('close_date')
+    status     = result.get('status', 'open')
+
+    if close_date is not None:
+        # close_date may already be a datetime or still a string
+        if isinstance(close_date, str):
+            close_date = _parse_date(close_date)
+        if close_date is not None:
+            result['status'] = 'open' if close_date > now else 'closed'
+    else:
+        result['status'] = status if status else 'open'
+
+    return result
+
+
 # ── AusTender GaPS ───────────────────────────────────────────
 
 def normalise_austender_csv(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -104,7 +132,7 @@ def normalise_austender_csv(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "agency":         agency[:255],
         "sector":         _infer_sector(title + " " + category),
         "state":          state,
-        "status":         "closed",
+        "status":         "closed",   # corrected by _correct_status()
         "contract_value": _parse_value(raw.get("Value")),
         "close_date":     _parse_date(raw.get("EndDate1")),
         "published_date": _parse_date(raw.get("ContractDate1")),
@@ -136,7 +164,7 @@ def normalise_qld_contracts(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "agency":         agency[:255],
         "sector":         _infer_sector(title + " " + category),
         "state":          "QLD",
-        "status":         "closed",
+        "status":         "closed",   # corrected by _correct_status()
         "contract_value": 0.0,
         "close_date":     _parse_date(raw.get("Expiry Date")),
         "published_date": _parse_date(raw.get("Start Date")),
@@ -181,7 +209,7 @@ def normalise_qld_pipeline(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "agency":         agency[:255],
         "sector":         _infer_sector(title + " " + category),
         "state":          "QLD",
-        "status":         "upcoming",
+        "status":         "upcoming",  # pipeline items — corrected by _correct_status()
         "contract_value": contract_value,
         "close_date":     close_date,
         "published_date": None,
@@ -245,7 +273,7 @@ def normalise_nsw_csv(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "agency":         agency[:255],
         "sector":         _infer_sector(title + " " + category),
         "state":          "NSW",
-        "status":         "closed",
+        "status":         "closed",   # corrected by _correct_status()
         "contract_value": value,
         "close_date":     _parse_date(raw.get("Expiry Date") or raw.get("End Date")),
         "published_date": _parse_date(raw.get("Effective Date") or raw.get("Start Date")),
@@ -259,22 +287,22 @@ def normalise_nsw_csv(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def normalise(source_name: str, raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if source_name == "austender":
-        return normalise_austender_csv(raw)
+        result = normalise_austender_csv(raw)
 
     elif source_name == "qld_tenders":
         label = raw.get("_source_label", "")
         if label == "Forward Pipeline":
-            return normalise_qld_pipeline(raw)
+            result = normalise_qld_pipeline(raw)
         else:
-            return normalise_qld_contracts(raw)
+            result = normalise_qld_contracts(raw)
 
     elif source_name == "nsw_etender":
-        return normalise_nsw_csv(raw)
+        result = normalise_nsw_csv(raw)
 
     elif source_name == "tendersnet":
         if not raw.get("title"):
             return None
-        return {
+        result = {
             "title":          raw.get("title"),
             "description":    raw.get("description", ""),
             "agency":         raw.get("agency", ""),
@@ -292,3 +320,7 @@ def normalise(source_name: str, raw: Dict[str, Any]) -> Optional[Dict[str, Any]]
     else:
         logger.warning(f"Unknown source: {source_name}")
         return None
+    if result is not None:
+        result = _correct_status(result)
+
+    return result
