@@ -182,9 +182,8 @@ function PasswordVerifyModal({ onConfirm, onCancel, loading, error }: PasswordMo
 
         <div className={styles.modalBody}>
           <div className={styles.field}>
-            <label className={styles.label}>Current Password</label>
+            <label className={styles.label}><Lock size={14} className={styles.inputIcon} /> Current Password </label>
             <div className={styles.inputWrap}>
-              <Lock size={14} className={styles.inputIcon} />
               <input
                 ref={inputRef}
                 className={styles.input}
