@@ -820,8 +820,8 @@ export default function TendersPage() {
               <div className={styles.scValueRow}>
                 <span className={styles.scValueLabel}>
                   {isActive && sourceName
-                    ? `${getSourceLabel(sourceName)} value`
-                    : 'Total value'}
+                    ? `${getSourceLabel(sourceName)} Value`
+                    : 'Total Value'}
                 </span>
                 <span
                   className={styles.scValue}
