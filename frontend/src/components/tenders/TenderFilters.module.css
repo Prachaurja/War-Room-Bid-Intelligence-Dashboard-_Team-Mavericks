@@ -22,7 +22,6 @@
     gap: 10px;
     flex: 1 1 1100px;
     min-width: min(1100px, 100%);
-    max-width: 900px;
   }
   
   .filterMenuBtn {
