@@ -57,12 +57,18 @@ const SECTION_SUBTITLES: Record<SectionId, string> = {
   'data-privacy': 'Manage Your Local Data and Preferences',
 };
 
-function getPref<T>(key: string, fallback: T): T {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+function userKey(userId: string, key: string) {
+  return `wr_${userId}_${key}`;
+}
+function getPref<T>(userId: string, key: string, fallback: T): T {
+  try { const v = localStorage.getItem(userKey(userId, key)); return v ? JSON.parse(v) : fallback; }
   catch { return fallback; }
 }
-function setPref<T>(key: string, val: T) {
-  localStorage.setItem(key, JSON.stringify(val));
+function setPref<T>(userId: string, key: string, val: T) {
+  localStorage.setItem(userKey(userId, key), JSON.stringify(val));
+}
+function removePref(userId: string, key: string) {
+  localStorage.removeItem(userKey(userId, key));
 }
 
 type ChannelKey = 'email' | 'sms' | 'push';
@@ -234,7 +240,8 @@ export default function SettingsPage() {
   const { user }                    = useAuth();
   const { updateUser }              = useAuthStore();
   const { themeMode, setThemeMode } = useUIStore();
-  const { prefs, setPrefs }         = useNotificationPreferences();
+  const uid = user?.id ?? 'default';
+  const { prefs, setPrefs } = useNotificationPreferences(uid);
   const [activeSection, setActive]  = useState<SectionId>('profile');
   const activeSectionMeta = SECTIONS.find(section => section.id === activeSection) ?? SECTIONS[0];
 
@@ -346,34 +353,44 @@ export default function SettingsPage() {
   };
 
   // ── Tender preferences ────────────────────────────────────
-  const [tenderPrefs, setTenderPrefs] = useState(() => getPref('wr_tender_prefs', {
+  const [tenderPrefs, setTenderPrefs] = useState(() => getPref(uid, 'tender_prefs', {
     defaultSector: '', defaultState: '', defaultSort: 'newest',
     defaultPageSize: '15', minValue: '',
   }));
+  useEffect(() => {
+    if (user?.id) {
+      setTenderPrefs(getPref(user.id, 'tender_prefs', {
+        defaultSector: '', defaultState: '', defaultSort: 'newest',
+        defaultPageSize: '15', minValue: '',
+      }));
+      setDisplayPrefs(getPref(user.id, 'display_prefs', DEFAULT_DISPLAY_PREFS));
+    }
+  }, [user?.id]);
+
   const saveTenderPrefs = () => {
-    setPref('wr_tender_prefs', tenderPrefs);
+    setPref(uid, 'tender_prefs', tenderPrefs);
     toast.success('Tender Preferences Saved');
   };
 
   // ── Display preferences ───────────────────────────────────
   const [displayPrefs, setDisplayPrefs] = useState<DisplayPrefs>(
-    () => getPref('wr_display_prefs', DEFAULT_DISPLAY_PREFS),
+    () => getPref(uid, 'display_prefs', DEFAULT_DISPLAY_PREFS),
   );
   const saveDisplayPrefs = (patch: Partial<DisplayPrefs>) => {
     const next = { ...displayPrefs, ...patch };
     setDisplayPrefs(next);
-    setPref('wr_display_prefs', next);
+    setPref(uid, 'display_prefs', next);
     toast.success('Display Preferences Saved');
   };
 
   // ── Data & privacy ────────────────────────────────────────
   const clearHistory = () => {
-    ['wr_stats_history','wr_stats_snapshot_ts','wr_last_total_tenders','wr_last_visit_ts']
-      .forEach(k => localStorage.removeItem(k));
+    ['stats_history','stats_snapshot_ts','last_total_tenders','last_visit_ts']
+      .forEach(k => removePref(uid, k));
     toast.success('History Cleared');
   };
   const resetAllPrefs = () => {
-    ['wr_tender_prefs','wr_alert_prefs','wr_display_prefs'].forEach(k => localStorage.removeItem(k));
+    ['tender_prefs','alert_prefs','display_prefs'].forEach(k => removePref(uid, k));
     toast.success('All Preferences Reset to Defaults');
     window.location.reload();
   };
@@ -381,8 +398,8 @@ export default function SettingsPage() {
     const data = {
       exported_at:   new Date().toISOString(),
       user:          { name: user?.name, email: user?.email, role: user?.role },
-      tender_prefs:  getPref('wr_tender_prefs', {}),
-      display_prefs: getPref('wr_display_prefs', {}),
+      tender_prefs:  getPref(uid, 'tender_prefs', {}),
+      display_prefs: getPref(uid, 'display_prefs', {}),
       notif_prefs:   prefs,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -854,7 +871,7 @@ export default function SettingsPage() {
                       <div className={`${styles.field} ${styles.fieldFull}`}><label className={styles.label}>Minimum Contract Value</label><input className={styles.input} type="number" placeholder="e.g. 100000 — leave empty for all values" value={tenderPrefs.minValue} onChange={e => setTenderPrefs(p => ({ ...p, minValue: e.target.value }))} /></div>
                     </div>
                     <div className={styles.actionRow}>
-                      <button className={styles.ghostBtn} onClick={() => { const d = { defaultSector:'', defaultState:'', defaultSort:'newest', defaultPageSize:'15', minValue:'' }; setTenderPrefs(d); setPref('wr_tender_prefs', d); toast.success('Reset to Defaults'); }}>Reset</button>
+                      <button className={styles.ghostBtn} onClick={() => { const d = { defaultSector:'', defaultState:'', defaultSort:'newest', defaultPageSize:'15', minValue:'' }; setTenderPrefs(d); setPref(uid, 'tender_prefs', d); toast.success('Reset to Defaults'); }}>Reset</button>
                       <button className={styles.primaryBtn} onClick={saveTenderPrefs}><Check size={13} /> Save Preferences</button>
                     </div>
                   </div>

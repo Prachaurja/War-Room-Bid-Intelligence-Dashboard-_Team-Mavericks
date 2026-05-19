@@ -164,21 +164,19 @@ const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: { pay
 };
 
 const SmoothScatterDot = ({ cx = 0, cy = 0, fill = '#3B82F6', payload }: ScatterDotProps) => {
-  const radius = Math.max(3.5, Math.min(9, Number(payload?.z ?? 6)));
+  const radius = Math.max(3.75, Math.min(8.5, Number(payload?.z ?? 6)));
 
   return (
-    <circle
-      cx={cx}
-      cy={cy}
-      r={radius}
-      fill={fill}
-      fillOpacity={0.82}
-      stroke={fill}
-      strokeOpacity={0.95}
-      strokeWidth={0.75}
-      shapeRendering="geometricPrecision"
-      vectorEffect="non-scaling-stroke"
-    />
+    <g>
+      <circle
+        cx={cx}
+        cy={cy}
+        r={radius}
+        fill={fill}
+        fillOpacity={0.88}
+        strokeWidth={0.45}
+      />
+    </g>
   );
 };
 
