@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,15 +16,18 @@ import {
   useStatusBreakdown, useClosingSoon,
   useWinWindow, useSectorStateHeatmap, useAgencyFrequency, useValueScatter,
   useSectorTreemap, useSectorStatusBreakdown,
+  type ClosingSoon,
   type ScatterPoint,
+  type StatusBreakdown,
+  type WinWindowData,
 } from '../../hooks/useAnalytics';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { sectorLabel, sectorColor } from '../../utils/tender.utils';
 import styles from './AnalyticsPage.module.css';
 import clsx from 'clsx';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-// ── Constants ─────────────────────────────────────────────────
+// Constants
 const STATE_COLORS: Record<string, string> = {
   NSW: '#3B82F6', VIC: '#8B5CF6', QLD: '#F59E0B',
   SA:  '#10B981', WA:  '#EC4899', ACT: '#06B6D4',
@@ -54,6 +57,10 @@ const DEPT_COLORS = [
   '#EC4899','#06B6D4','#EF4444','#84CC16','#8B5CF6','#F97316',
 ];
 
+const RING_OPEN_COLOR = sectorColor('it_services');
+const RING_UPCOMING_COLOR = '#F59E0B';
+const RING_CLOSED_COLOR = '#6B7280';
+
 const escapeHtml = (value: unknown) =>
   String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -76,7 +83,7 @@ function heatTextColor(value: number, max: number): string {
   return value > max * 0.45 ? '#fff' : 'var(--text-primary)';
 }
 
-// Local sector label map — guaranteed correct capitalisation
+// Local sector label map - guaranteed correct capitalisation
 const SECTOR_LABEL_MAP: Record<string, string> = {
   facility_management: 'Facility Mgmt',
   construction:        'Construction',
@@ -90,38 +97,6 @@ const SECTOR_LABEL_MAP: Record<string, string> = {
 const getSectorLabel = (sec: string): string =>
   SECTOR_LABEL_MAP[sec] ?? sec.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-// ── Tooltips ──────────────────────────────────────────────────
-type TooltipEntry = { color: string; name: string; value: number };
-const DarkTooltip = ({ active, payload, label }: { active?: boolean; payload?: TooltipEntry[]; label?: string }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className={styles.tooltip}>
-      {label && <p className={styles.tooltipTitle}>{label}</p>}
-      {payload.map((p, i) => (
-        <p key={i} className={styles.tooltipRow}>
-          <span style={{ color: p.color }}>{p.name}</span>
-          <strong>{typeof p.value === 'number' && p.value > 10000 ? formatCurrency(p.value) : formatNumber(p.value)}</strong>
-        </p>
-      ))}
-    </div>
-  );
-};
-
-const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: ScatterPoint & { x: number; y: number; z: number } }[] }) => {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  if (!d) return null;
-  return (
-    <div className={styles.tooltip} style={{ maxWidth: 240 }}>
-      <p className={styles.tooltipTitle} style={{ fontSize: 12, marginBottom: 4 }}>{d.title}</p>
-      <p className={styles.tooltipRow}><span>Agency</span><strong>{d.agency}</strong></p>
-      <p className={styles.tooltipRow}><span>Value</span><strong>{formatCurrency(d.contract_value)}</strong></p>
-      <p className={styles.tooltipRow}><span>Closes</span><strong>{d.close_date ? new Date(d.close_date).toLocaleDateString('en-AU') : '—'}</strong></p>
-      <p className={styles.tooltipRow}><span>State</span><strong>{d.state}</strong></p>
-    </div>
-  );
-};
-
 const Shimmer = ({ h = 240 }: { h?: number }) => (
   <div className={styles.shimmer} style={{ height: h, borderRadius: 8 }} />
 );
@@ -131,6 +106,248 @@ const Empty = ({ label }: { label: string }) => (
     {label}
   </div>
 );
+
+type TooltipEntry = { color?: string; name?: string; value?: number | string };
+type StatusChartDatum = StatusBreakdown & { label: string; fill: string };
+type StateChartDatum = {
+  state: string;
+  count: number;
+  total_value: number;
+  fill: string;
+};
+type ScatterChartPoint = ScatterPoint & { x: number; y: number; z: number };
+type ScatterDotProps = {
+  cx?: number;
+  cy?: number;
+  fill?: string;
+  payload?: ScatterChartPoint;
+};
+
+const formatAxisCurrency = (value: number) => {
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(0)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+};
+
+const DarkTooltip = ({ active, payload, label }: { active?: boolean; payload?: TooltipEntry[]; label?: string }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className={styles.tooltip}>
+      {label && <p className={styles.tooltipTitle}>{label}</p>}
+      {payload.map((p, i) => {
+        const value = Number(p.value ?? 0);
+        return (
+          <p key={i} className={styles.tooltipRow}>
+            <span style={{ color: p.color }}>{p.name}</span>
+            <strong>{value > 10000 ? formatCurrency(value) : formatNumber(value)}</strong>
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
+const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: ScatterChartPoint }[] }) => {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+  return (
+    <div className={styles.tooltip} style={{ maxWidth: 240 }}>
+      <p className={styles.tooltipTitle} style={{ fontSize: 12, marginBottom: 4 }}>{d.title}</p>
+      <p className={styles.tooltipRow}><span>Agency</span><strong>{d.agency}</strong></p>
+      <p className={styles.tooltipRow}><span>Value</span><strong>{formatCurrency(d.contract_value)}</strong></p>
+      <p className={styles.tooltipRow}><span>Closes</span><strong>{d.close_date ? new Date(d.close_date).toLocaleDateString('en-AU') : '-'}</strong></p>
+      <p className={styles.tooltipRow}><span>State</span><strong>{d.state}</strong></p>
+    </div>
+  );
+};
+
+const SmoothScatterDot = ({ cx = 0, cy = 0, fill = '#3B82F6', payload }: ScatterDotProps) => {
+  const radius = Math.max(3.75, Math.min(8.5, Number(payload?.z ?? 6)));
+
+  return (
+    <g>
+      <circle
+        cx={cx}
+        cy={cy}
+        r={radius}
+        fill={fill}
+        fillOpacity={0.88}
+        strokeWidth={0.45}
+      />
+    </g>
+  );
+};
+
+function StatusPieChart({ data }: { data: StatusChartDatum[] }) {
+  return (
+    <div className={styles.pieWrap}>
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie data={data} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} stroke="none">
+            {data.map(e => <Cell key={e.status} fill={e.fill} />)}
+          </Pie>
+          <Tooltip formatter={(v) => formatNumber(Number(v ?? 0))} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className={styles.pieLegend}>
+        {data.map(d => (
+          <div key={d.status} className={styles.legendItem}>
+            <span className={styles.legendDot} style={{ background: d.fill }} />
+            <span className={styles.legendLabel}>{d.label}</span>
+            <span className={styles.legendValue}>{formatNumber(d.count)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ClosingSoonChart({ data }: { data: ClosingSoon }) {
+  return (
+    <div style={{ padding: '8px 0' }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+        {data.buckets.map(b => (
+          <div key={b.label} style={{ flex: 1, background: b.color + '12', border: `1px solid ${b.color}30`, borderRadius: 12, padding: '14px 12px', textAlign: 'center' }}>
+            <p style={{ fontSize: 28, fontWeight: 800, color: b.color, margin: 0 }}>{formatNumber(b.count)}</p>
+            <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '4px 0 0' }}>{b.label}</p>
+          </div>
+        ))}
+      </div>
+      <ResponsiveContainer width="100%" height={120}>
+        <BarChart data={data.buckets} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+          <XAxis dataKey="label" tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis hide />
+          <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+          <Bar dataKey="count" name="Tenders" radius={[5, 5, 0, 0]} maxBarSize={60}>
+            {data.buckets.map(b => <Cell key={b.label} fill={b.color} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function WinWindowChart({ data }: { data: WinWindowData }) {
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        {data.data.map((month: Record<string, string | number>) => {
+          const total = (data.sectors ?? []).reduce((s: number, sec: string) => s + ((month[sec] as number) ?? 0), 0);
+          return (
+            <div key={String(month.month)} style={{
+              flex: 1, background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 12, padding: '12px 16px', textAlign: 'center',
+            }}>
+              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 4px' }}>{String(month.month)}</p>
+              <p style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{total}</p>
+              <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '2px 0 0' }}>tenders closing</p>
+            </div>
+          );
+        })}
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={data.data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+          <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+          <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+          {(data.sectors ?? []).map((sec: string, i: number) => (
+            <Bar key={sec} dataKey={sec} name={getSectorLabel(sec)} stackId="win"
+              fill={sectorColor(sec)} maxBarSize={80}
+              radius={i === (data.sectors.length - 1) ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', marginTop: 14 }}>
+        {(data.sectors ?? []).map((sec: string) => {
+          const total = data.data.reduce((s: number, m: Record<string, string | number>) => s + ((m[sec] as number) ?? 0), 0);
+          return (
+            <div key={sec} style={{ display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', borderRadius: 99,
+              background: sectorColor(sec) + '15',
+              border: `1px solid ${sectorColor(sec)}30` }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: sectorColor(sec), flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{getSectorLabel(sec)}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: sectorColor(sec) }}>{total}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StateDistributionChart({
+  data,
+  activeMetric,
+}: {
+  data: StateChartDatum[];
+  activeMetric: 'count' | 'value';
+}) {
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={data} margin={{ top: 4, right: 10, bottom: 4, left: 6 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+        <XAxis dataKey="state" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+        <YAxis
+          tick={{ fill: 'var(--text-dim)', fontSize: 10 }}
+          axisLine={false}
+          tickLine={false}
+          width={activeMetric === 'value' ? 58 : 44}
+          tickFormatter={(v: number) => activeMetric === 'value' ? formatAxisCurrency(v) : formatNumber(v)}
+        />
+        <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+        <Bar dataKey={activeMetric === 'count' ? 'count' : 'total_value'} name={activeMetric === 'count' ? 'Contracts' : 'Value'} radius={[5, 5, 0, 0]} maxBarSize={36}>
+          {data.map(e => <Cell key={e.state} fill={e.fill} />)}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function TenderValueScatterChart({ data }: { data: ScatterChartPoint[] }) {
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={300}>
+        <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+          <XAxis dataKey="x" type="number" domain={['auto', 'auto']} name="Close Date"
+            tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false}
+            tickFormatter={(v: number) => new Date(v).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' })}
+          />
+          <YAxis dataKey="y" type="number" name="Value"
+            tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} width={56}
+            tickFormatter={(v: number) => formatAxisCurrency(v)}
+          />
+          <ZAxis dataKey="z" range={[30, 400]} />
+          <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+          {Array.from(new Set(data.map(d => d.sector))).map(sec => (
+            <Scatter
+              key={sec}
+              name={sectorLabel(sec)}
+              data={data.filter(d => d.sector === sec)}
+              fill={sectorColor(sec)}
+              shape={<SmoothScatterDot />}
+            />
+          ))}
+        </ScatterChart>
+      </ResponsiveContainer>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 10 }}>
+        {Array.from(new Set(data.map(d => d.sector))).map(sec => (
+          <div key={sec} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: sectorColor(sec) }} />
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{sectorLabel(sec)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const ChartCard = ({
   children,
@@ -156,12 +373,69 @@ const ChartCard = ({
   </motion.div>
 );
 
-// ── Page ──────────────────────────────────────────────────────
+const ViewportChart = ({ height = 300, children }: { height?: number; children: ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: '220px 0px' });
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    if (!inView || shouldRender) return;
+
+    const browserWindow = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (browserWindow.requestIdleCallback) {
+      const idleId = browserWindow.requestIdleCallback(() => setShouldRender(true), { timeout: 300 });
+      return () => browserWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timerId = window.setTimeout(() => setShouldRender(true), 80);
+    return () => window.clearTimeout(timerId);
+  }, [inView, shouldRender]);
+
+  return (
+    <div ref={ref}>
+      {shouldRender ? children : <Shimmer h={height} />}
+    </div>
+  );
+};
+
+const ViewportGate = ({ children }: { children: (ready: boolean) => ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: '220px 0px' });
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    if (!inView || shouldRender) return;
+
+    const browserWindow = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (browserWindow.requestIdleCallback) {
+      const idleId = browserWindow.requestIdleCallback(() => setShouldRender(true), { timeout: 120 });
+      return () => browserWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timerId = window.setTimeout(() => setShouldRender(true), 30);
+    return () => window.clearTimeout(timerId);
+  }, [inView, shouldRender]);
+
+  return (
+    <div ref={ref} className={styles.chartsRow2}>
+      {children(shouldRender)}
+    </div>
+  );
+};
+
+// Page
 export default function AnalyticsPage() {
   const [activeMetric, setActiveMetric] = useState<'count' | 'value'>('count');
   const pageRef = useRef<HTMLDivElement>(null);
-
-  // ── Data hooks ────────────────────────────────────────────
+  // Data hooks
   const { data: sectorData,    isLoading: sectorLoading    } = useSectorStats();
   const { data: stateData,     isLoading: stateLoading     } = useStateStats();
   const { data: overview,      isLoading: overviewLoading  } = useOverviewStats();
@@ -174,8 +448,7 @@ export default function AnalyticsPage() {
   const { data: scatterData,   isLoading: scatterLoading    } = useValueScatter();
   const { data: treemapData,   isLoading: treemapLoading    } = useSectorTreemap();
   const { data: sectorStatus,  isLoading: sectorStatusLoading } = useSectorStatusBreakdown();
-
-  // ── Derived ───────────────────────────────────────────────
+  // Derived data
   const sectorChartData = useMemo(() => (sectorData ?? [])
     .filter(d => d.sector && KNOWN_SECTORS.has(d.sector))
     .sort((a, b) => b.count - a.count)
@@ -335,7 +608,7 @@ export default function AnalyticsPage() {
       const upcomingPct = sector.total > 0 ? Math.round((sector.upcoming / sector.total) * 100) : 0;
       return `
         <div class="ring-card">
-          <div class="ring" style="--open:${openPct}; --upcoming:${upcomingPct}; --color:${sectorColor(sector.sector)}">
+          <div class="ring" style="--open:${openPct}; --upcoming:${upcomingPct}; --color:${RING_OPEN_COLOR}">
             <strong>${formatNumber(sector.total)}</strong>
           </div>
           <span>${escapeHtml(getSectorLabel(sector.sector))}</span>
@@ -465,7 +738,7 @@ export default function AnalyticsPage() {
               <article class="card"><h2>Agency Frequency</h2><p>Top agencies by tender count</p>${agencyRows || '<p>No agency data</p>'}</article>
               <article class="card"><h2>State Distribution - Count</h2><p>Tender volume by Australian state</p>${stateRows || '<p>No state data</p>'}</article>
               <article class="card"><h2>State Distribution - Value</h2><p>Total value by Australian state</p>${stateValueRows || '<p>No state value data</p>'}</article>
-              <article class="card"><h2>Sector Completion Rings</h2><p>Open, upcoming and closed breakdown per sector</p><div class="ring-grid">${ringRows || '<p>No sector status data</p>'}</div></article>
+              <article class="card"><h2>Sector Completion Rings</h2><p>Open / upcoming / closed breakdown per sector</p><div class="ring-grid">${ringRows || '<p>No sector status data</p>'}</div></article>
               <article class="card wide"><h2>Tender Value Scatter</h2><p>Upcoming tenders with value, plotted by close date and contract value</p><div class="scatter">${scatterRows || '<p>No upcoming tenders with contract value</p>'}</div></article>
               <article class="card wide"><h2>Sector x State Treemap</h2><p>Tender volume by sector and state</p><div class="tile-wrap">${treemapRows || '<p>No treemap data</p>'}</div></article>
               <article class="card"><h2>Top Sectors by Contract Value</h2><p>Top 5 sectors ranked by awarded value</p>${sectorRows || '<p>No sector data</p>'}</article>
@@ -835,33 +1108,17 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Row 1: Status + Closing Soon */}
-      <div className={styles.chartsRow2}>
+      <ViewportGate>
+        {(rowReady) => (
+          <>
         <ChartCard delay={0.08}>
           <div className={styles.chartHeader}>
             <div><h3 className={styles.chartTitle}>Tender Status</h3><p className={styles.chartSub}>Open vs Closed vs Upcoming</p></div>
             <div className={styles.pill}>{(statusData ?? []).reduce((s, d) => s + d.count, 0)} total</div>
           </div>
-          {statusLoading ? <Shimmer /> : statusChartData.length === 0 ? <Empty label="No status data" /> : (
-            <div className={styles.pieWrap}>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={statusChartData} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3}>
-                    {statusChartData.map(e => <Cell key={e.status} fill={e.fill} />)}
-                  </Pie>
-                  <Tooltip formatter={(v) => formatNumber(Number(v ?? 0))} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className={styles.pieLegend}>
-                {statusChartData.map(d => (
-                  <div key={d.status} className={styles.legendItem}>
-                    <span className={styles.legendDot} style={{ background: d.fill }} />
-                    <span className={styles.legendLabel}>{d.label}</span>
-                    <span className={styles.legendValue}>{formatNumber(d.count)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {rowReady ? statusLoading ? <Shimmer /> : statusChartData.length === 0 ? <Empty label="No status data" /> : (
+            <StatusPieChart data={statusChartData} />
+          ) : <Shimmer h={220} />}
         </ChartCard>
 
         <ChartCard delay={0.12}>
@@ -869,104 +1126,42 @@ export default function AnalyticsPage() {
             <div><h3 className={styles.chartTitle}>Closing Soon</h3><p className={styles.chartSub}>Active Tenders by Days Remaining</p></div>
             <div className={styles.pill}><Clock size={11} /> {closingData?.total_active ?? 0} active</div>
           </div>
-          {closingLoading ? <Shimmer /> : !closingData ? <Empty label="No deadline data" /> : (
-            <div style={{ padding: '8px 0' }}>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-                {closingData.buckets.map(b => (
-                  <div key={b.label} style={{ flex: 1, background: b.color + '12', border: `1px solid ${b.color}30`, borderRadius: 12, padding: '14px 12px', textAlign: 'center' }}>
-                    <p style={{ fontSize: 28, fontWeight: 800, color: b.color, margin: 0 }}>{formatNumber(b.count)}</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '4px 0 0' }}>{b.label}</p>
-                  </div>
-                ))}
-              </div>
-              <ResponsiveContainer width="100%" height={120}>
-                <BarChart data={closingData.buckets} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
-                  <XAxis dataKey="label" tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis hide />
-                  <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                  <Bar dataKey="count" name="Tenders" radius={[5, 5, 0, 0]} maxBarSize={60}>
-                    {closingData.buckets.map(b => <Cell key={b.label} fill={b.color} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          {rowReady ? closingLoading ? <Shimmer /> : !closingData ? <Empty label="No deadline data" /> : (
+            <ClosingSoonChart data={closingData} />
+          ) : <Shimmer h={240} />}
         </ChartCard>
-      </div>
+          </>
+        )}
+      </ViewportGate>
 
       {/* Row 2: Win Window */}
       <ChartCard delay={0.16}>
         <div className={styles.chartHeader}>
           <div>
-            <h3 className={styles.chartTitle}>Win Window — Next 90 Days</h3>
-            <p className={styles.chartSub}>Tenders Closing This Quarter by Sector — Focus Your Bid Efforts Here</p>
+            <h3 className={styles.chartTitle}>Win Window - Next 90 Days</h3>
+            <p className={styles.chartSub}>Tenders Closing This Quarter by Sector - Focus Your Bid Efforts Here</p>
           </div>
           <div className={styles.pill}>
             <Target size={11} /> Next 90 days
           </div>
         </div>
+        <ViewportChart height={260}>
         {winLoading ? <Shimmer h={260} /> : !winWindow?.data?.length ? <Empty label="No tenders closing in the next 90 days" /> : (
-          <div>
-            {/* Month summary cards */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-              {winWindow.data.map((month: Record<string, string | number>) => {
-                const total = (winWindow.sectors ?? []).reduce((s: number, sec: string) => s + ((month[sec] as number) ?? 0), 0);
-                return (
-                  <div key={String(month.month)} style={{
-                    flex: 1, background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 12, padding: '12px 16px', textAlign: 'center'
-                  }}>
-                    <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 4px' }}>{String(month.month)}</p>
-                    <p style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{total}</p>
-                    <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '2px 0 0' }}>Tenders Closing</p>
-                  </div>
-                );
-              })}
-            </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={winWindow.data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
-                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                {(winWindow.sectors ?? []).map((sec: string, i: number) => (
-                  <Bar key={sec} dataKey={sec} name={getSectorLabel(sec)} stackId="win"
-                    fill={sectorColor(sec)} maxBarSize={80}
-                    radius={i === (winWindow.sectors.length - 1) ? [6, 6, 0, 0] : [0, 0, 0, 0]}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', marginTop: 14 }}>
-              {(winWindow.sectors ?? []).map((sec: string) => {
-                const total = winWindow.data.reduce((s: number, m: Record<string, string | number>) => s + ((m[sec] as number) ?? 0), 0);
-                return (
-                  <div key={sec} style={{ display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '4px 10px', borderRadius: 99,
-                    background: sectorColor(sec) + '15',
-                    border: `1px solid ${sectorColor(sec)}30` }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: sectorColor(sec), flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{getSectorLabel(sec)}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: sectorColor(sec) }}>{total}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <WinWindowChart data={winWindow} />
         )}
+        </ViewportChart>
       </ChartCard>
 
-      {/* Row 3: Sector × State Heatmap */}
+      {/* Row 3: Sector x State Heatmap */}
       <ChartCard defer>
         <div className={styles.chartHeader}>
           <div>
-            <h3 className={styles.chartTitle}>Sector × State Heatmap</h3>
-            <p className={styles.chartSub}>Tender Activity by Sector and State — Darker = More Tenders</p>
+            <h3 className={styles.chartTitle}>Sector x State Heatmap</h3>
+            <p className={styles.chartSub}>Tender Activity by Sector and State - Darker = More Tenders</p>
           </div>
         </div>
-        {heatLoading ? <Shimmer h={280} /> : !heatmap?.sectors?.length ? <Empty label="No heatmap data" /> : (
+          <ViewportChart height={280}>
+          {heatLoading ? <Shimmer h={280} /> : !heatmap?.sectors?.length ? <Empty label="No heatmap data" /> : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 3, tableLayout: 'auto' }}>
               <thead>
@@ -989,9 +1184,9 @@ export default function AnalyticsPage() {
                     {heatmap.states.map(st => {
                       const val = heatmap.matrix?.[sec]?.[st] ?? 0;
                       return (
-                        <td key={st} title={`${sectorLabel(sec)} × ${st}: ${val}`}
+                        <td key={st} title={`${sectorLabel(sec)} x ${st}: ${val}`}
                           style={{ background: heatColor(val, heatMax), borderRadius: 6, textAlign: 'center', padding: '9px 4px', paddingBottom: 3, fontSize: 11, fontWeight: val > 0 ? 800 : 500, color: heatTextColor(val, heatMax), textShadow: val > 0 ? '0 1px 2px rgba(255,255,255,0.35)' : 'none' }}>
-                          {val > 0 ? formatNumber(val) : '—'}
+                          {val > 0 ? formatNumber(val) : '-'}
                         </td>
                       );
                     })}
@@ -1001,15 +1196,17 @@ export default function AnalyticsPage() {
             </table>
           </div>
         )}
+          </ViewportChart>
       </ChartCard>
 
       {/* Row 4: Agency Frequency + State bar */}
       <div className={styles.chartsRow2}>
         <ChartCard defer>
           <div className={styles.chartHeader}>
-            <div><h3 className={styles.chartTitle}>Agency Frequency</h3><p className={styles.chartSub}>Top 15 Agencies by Tender Count — Spot Repeat Clients</p></div>
+            <div><h3 className={styles.chartTitle}>Agency Frequency</h3><p className={styles.chartSub}>Top 15 Agencies by Tender Count - Spot Repeat Clients</p></div>
             <div className={styles.pill}><Users size={11} /> Top 15</div>
           </div>
+          <ViewportChart height={340}>
           {agencyLoading ? <Shimmer h={340} /> : !agencyFreq?.length ? <Empty label="No agency data" /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               {(agencyFreq ?? []).map((a, i) => {
@@ -1035,6 +1232,7 @@ export default function AnalyticsPage() {
               })}
             </div>
           )}
+          </ViewportChart>
         </ChartCard>
 
         <ChartCard defer>
@@ -1045,19 +1243,11 @@ export default function AnalyticsPage() {
               <button className={clsx(styles.toggleBtn, activeMetric === 'value' && styles.toggleBtnActive)} onClick={() => setActiveMetric('value')}>Value</button>
             </div>
           </div>
+          <ViewportChart height={300}>
           {stateLoading ? <Shimmer h={300} /> : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={stateChartData} margin={{ top: 4, right: 8, bottom: 4, left: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="state" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} axisLine={false} tickLine={false} width={76} />
-                <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                <Bar dataKey={activeMetric === 'count' ? 'count' : 'total_value'} name={activeMetric === 'count' ? 'Contracts' : 'Value'} radius={[5, 5, 0, 0]} maxBarSize={36}>
-                  {stateChartData.map(e => <Cell key={e.state} fill={e.fill} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <StateDistributionChart data={stateChartData} activeMetric={activeMetric} />
           )}
+          </ViewportChart>
         </ChartCard>
       </div>
 
@@ -1066,40 +1256,15 @@ export default function AnalyticsPage() {
         <div className={styles.chartHeader}>
           <div>
             <h3 className={styles.chartTitle}>Tender Value Scatter</h3>
-            <p className={styles.chartSub}>Upcoming Tenders with Value — X = Close Date · Y = Contract Value · Size = Scale</p>
+            <p className={styles.chartSub}>Upcoming Tenders with Value - X = Close Date / Y = Contract Value / Size = Scale</p>
           </div>
           <div className={styles.pill}><DollarSign size={11} /> {scatterPoints.length} tenders with value</div>
         </div>
+        <ViewportChart height={300}>
         {scatterLoading ? <Shimmer h={300} /> : !scatterPoints.length ? <Empty label="No upcoming tenders with contract value" /> : (
-          <div>
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="x" type="number" domain={['auto', 'auto']} name="Close Date"
-                  tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false}
-                  tickFormatter={(v: number) => new Date(v).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' })}
-                />
-                <YAxis dataKey="y" type="number" name="Value"
-                  tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} width={56}
-                  tickFormatter={(v: number) => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(0)}M` : `$${(v/1000).toFixed(0)}K`}
-                />
-                <ZAxis dataKey="z" range={[30, 400]} />
-                <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                {Array.from(new Set(scatterPoints.map(d => d.sector))).map(sec => (
-                  <Scatter key={sec} name={sectorLabel(sec)} data={scatterPoints.filter(d => d.sector === sec)} fill={sectorColor(sec)} fillOpacity={0.75} />
-                ))}
-              </ScatterChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 10 }}>
-              {Array.from(new Set(scatterPoints.map(d => d.sector))).map(sec => (
-                <div key={sec} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: sectorColor(sec) }} />
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{sectorLabel(sec)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <TenderValueScatterChart data={scatterPoints} />
         )}
+        </ViewportChart>
       </ChartCard>
 
       {/* Row 6: Radial Sector Completion */}
@@ -1107,10 +1272,11 @@ export default function AnalyticsPage() {
         <div className={styles.chartHeader}>
           <div>
             <h3 className={styles.chartTitle}>Sector Completion Rings</h3>
-            <p className={styles.chartSub}>Open · Upcoming · Closed Breakdown Per Sector</p>
+            <p className={styles.chartSub}>Open / Upcoming / Closed Breakdown Per Sector</p>
           </div>
           <div className={styles.pill}>All Sectors</div>
         </div>
+        <ViewportChart height={280}>
         {sectorStatusLoading ? <Shimmer h={280} /> : !sectorStatus?.length ? <Empty label="No sector data" /> : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16, padding: '8px 0' }}>
             {sectorStatus.map(s => {
@@ -1131,16 +1297,16 @@ export default function AnalyticsPage() {
                   <div style={{ position: 'relative', width: 96, height: 96 }}>
                     <svg width="96" height="96" viewBox="0 0 96 96" style={{ transform: 'rotate(-90deg)' }}>
                       <circle cx="48" cy="48" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
-                      {/* Closed — grey */}
-                      <circle cx="48" cy="48" r={r} fill="none" stroke="#6B7280" strokeWidth="10"
+                      {/* Closed - grey */}
+                      <circle cx="48" cy="48" r={r} fill="none" stroke={RING_CLOSED_COLOR} strokeWidth="10"
                         strokeDasharray={`${closedDash} ${circ - closedDash}`}
                         strokeDashoffset={closedOffset} strokeLinecap="butt" />
-                      {/* Upcoming — amber */}
-                      <circle cx="48" cy="48" r={r} fill="none" stroke="#F59E0B" strokeWidth="10"
+                      {/* Upcoming - amber */}
+                      <circle cx="48" cy="48" r={r} fill="none" stroke={RING_UPCOMING_COLOR} strokeWidth="10"
                         strokeDasharray={`${upcomingDash} ${circ - upcomingDash}`}
                         strokeDashoffset={upcomingOffset} strokeLinecap="butt" />
-                      {/* Open — sector colour */}
-                      <circle cx="48" cy="48" r={r} fill="none" stroke={sectorColor(s.sector)} strokeWidth="10"
+                      {/* Open - sector colour */}
+                      <circle cx="48" cy="48" r={r} fill="none" stroke={RING_OPEN_COLOR} strokeWidth="10"
                         strokeDasharray={`${openDash} ${circ - openDash}`}
                         strokeDashoffset={openOffset} strokeLinecap="butt" />
                     </svg>
@@ -1156,28 +1322,30 @@ export default function AnalyticsPage() {
                   </span>
                   {/* Mini stats */}
                   <div style={{ display: 'flex', gap: 6, fontSize: 10 }}>
-                    <span style={{ color: sectorColor(s.sector) }}>{s.open} Open</span>
-                    <span style={{ color: 'var(--text-dim)' }}>·</span>
-                    <span style={{ color: '#F59E0B' }}>{s.upcoming} Upcoming</span>
+                    <span style={{ color: RING_OPEN_COLOR }}>{s.open} Open</span>
+                    <span style={{ color: 'var(--text-dim)' }}>/</span>
+                    <span style={{ color: RING_UPCOMING_COLOR }}>{s.upcoming} Upcoming</span>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
+        </ViewportChart>
       </ChartCard>
 
       {/* Row 7: Treemap */}
       <ChartCard defer>
         <div className={styles.chartHeader}>
           <div>
-            <h3 className={styles.chartTitle}>Sector × State Treemap</h3>
-            <p className={styles.chartSub}>Tender Volume by Sector and State — Area = Count</p>
+            <h3 className={styles.chartTitle}>Sector x State Treemap</h3>
+            <p className={styles.chartSub}>Tender Volume by Sector and State - Area = Count</p>
           </div>
           <div className={styles.pill}>All States</div>
         </div>
+        <ViewportChart height={320}>
         {treemapLoading ? <Shimmer h={320} /> : !treemapData?.length ? <Empty label="No treemap data" /> : (() => {
-          // Build nested structure: sector → states
+          // Build nested structure: sector to states
           const sectors: Record<string, {state: string; count: number}[]> = {};
           (treemapData ?? []).forEach(d => {
             if (!sectors[d.sector]) sectors[d.sector] = [];
@@ -1232,6 +1400,7 @@ export default function AnalyticsPage() {
             </div>
           );
         })()}
+        </ViewportChart>
       </ChartCard>
 
       {/* Row 7: Top Sectors by Value + Top Departments */}
@@ -1284,3 +1453,4 @@ export default function AnalyticsPage() {
     </div>
   );
 }
+

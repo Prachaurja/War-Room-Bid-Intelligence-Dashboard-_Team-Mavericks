@@ -42,10 +42,10 @@ const PAGE_SIZES: Array<{ value: PageSize; label: string }> = [
 const SORT_FIELDS: Array<{ value: TenderSortField; label: string }> = [
   { value: 'created_at', label: 'Default' },
   { value: 'title', label: 'Tender Name' },
+  { value: 'agency', label: 'Agency' },
   { value: 'published_date', label: 'Publish Date' },
   { value: 'close_date', label: 'Close Date' },
   { value: 'contract_value', label: 'Value' },
-  { value: 'agency', label: 'Agency' },
 ];
 
 const defaultSortDirection = (field: TenderSortField): SortDirection =>
@@ -231,16 +231,19 @@ export default function TenderFilters({
               )}
             </AnimatePresence>
           </div>
-          <select
-            className={styles.pageSizeSelect}
-            value={pageSize}
-            onChange={(event) => onPageSize(event.target.value as PageSize)}
-            aria-label="Items per page"
-          >
-            {PAGE_SIZES.map((item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
-            ))}
-          </select>
+          <div className={styles.pageSizeWrap}>
+            <select
+              className={styles.pageSizeSelect}
+              value={pageSize}
+              onChange={(event) => onPageSize(event.target.value as PageSize)}
+              aria-label="Items per page"
+            >
+              {PAGE_SIZES.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className={styles.selectChevron} />
+          </div>
         </div>
         <div className={styles.rightGroup}>
           {loading ? (

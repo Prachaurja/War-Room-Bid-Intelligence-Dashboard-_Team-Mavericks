@@ -317,6 +317,15 @@
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  margin:  3px 0 3px;
+  gap: 8px;
+}
+
+.inputIcon {
+  color: var(--text-dim);
+  transform: translateY(-0.8px);
 }
 
 .input {
