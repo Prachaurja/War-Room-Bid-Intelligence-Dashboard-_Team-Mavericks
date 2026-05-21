@@ -151,7 +151,7 @@ export default function OverviewPage() {
     {
       title:    'Total Tender Value',
       value:    formatCurrency(stats?.total_value),
-      sub:      `Avg ${formatCurrency(stats?.avg_value)} per tender`,
+      sub:      `Avg ${formatCurrency(stats?.avg_value)} Per Tender`,
       icon:     DollarSign,
       gradient: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
       change:   changes.total_value,
@@ -159,7 +159,7 @@ export default function OverviewPage() {
     {
       title:    'Total Tender Bids',
       value:    formatNumber(stats?.total_tenders),
-      sub:      `Across ${Object.keys(stats?.sources ?? {}).length} data sources`,
+      sub:      `Across ${Object.keys(stats?.sources ?? {}).length} Data Sources`,
       icon:     Layers,
       gradient: 'linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%)',
       change:   changes.total_tenders,
@@ -168,7 +168,7 @@ export default function OverviewPage() {
       title:    'Active Bids',
       value:    formatNumber(stats?.active_tenders ?? 0),
       sub:      stats?.upcoming_tenders
-        ? `+ ${formatNumber(stats.upcoming_tenders)} upcoming`
+        ? `+ ${formatNumber(stats.upcoming_tenders)} Upcoming`
         : 'Live procurement opportunities',
       icon:     Activity,
       gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
@@ -177,7 +177,7 @@ export default function OverviewPage() {
     {
       title:    'Closed Bids',
       value:    formatNumber(stats?.closed_tenders),
-      sub:      'Historical awarded contracts',
+      sub:      'Historical Awarded Contracts',
       icon:     CheckCircle2,
       gradient: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
       change:   changes.closed_tenders,
