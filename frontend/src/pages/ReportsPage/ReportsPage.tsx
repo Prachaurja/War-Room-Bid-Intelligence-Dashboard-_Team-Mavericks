@@ -11,7 +11,7 @@ import { useAuthStore } from '../../store/auth.store';
 import styles from './ReportsPage.module.css';
 import clsx from 'clsx';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 type ReportStatus = 'completed' | 'processing' | 'scheduled';
 
@@ -171,14 +171,6 @@ export default function ReportsPage() {
           <h2 className={styles.heading}>Reports</h2>
           <p className={styles.headingSub}>Generate and Export Procurement Intelligence Reports</p>
         </div>
-        <div className={styles.headerActions}>
-          <button className={styles.ghostBtn} onClick={exportSectorCSV}>
-            <Download size={13} /> Sector CSV
-          </button>
-          <button className={styles.primaryBtn} onClick={exportStateCSV}>
-            <Download size={13} /> Regional CSV
-          </button>
-        </div>
       </div>
 
       <div className={styles.statGrid}>
@@ -219,90 +211,6 @@ export default function ReportsPage() {
           ))}
         </div>
       </div>
-
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Report Library</h3>
-          <div className={styles.typeFilters}>
-            {['all','sector','regional','value','source','custom'].map(t => (
-              <button key={t}
-                className={clsx(styles.typeFilter, activeType === t && styles.typeFilterActive)}
-                onClick={() => setActiveType(t)}>
-                {t === 'all' ? 'All' : TYPE_LABELS[t]}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className={styles.reportList}>
-          {filteredReports.map((report, i) => (
-            <motion.div key={report.id} className={styles.reportRow}
-              initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }} transition={{ delay: i*0.05 }}>
-              <div className={styles.reportTypeDot} style={{ background: TYPE_COLORS[report.type] }} />
-              <div className={styles.reportInfo}>
-                <div className={styles.reportTitleRow}>
-                  <h4 className={styles.reportTitle}>{report.title}</h4>
-                  <StatusBadge status={report.status} />
-                </div>
-                <p className={styles.reportDesc}>{report.description}</p>
-                <div className={styles.reportMeta}>
-                  <span>{report.id}</span>
-                  <span className={styles.metaDot}>·</span>
-                  <span>{TYPE_LABELS[report.type]}</span>
-                  {report.records > 0 && <><span className={styles.metaDot}>·</span><span>{formatNumber(report.records)} records</span></>}
-                  {report.size !== '—' && <><span className={styles.metaDot}>·</span><span>{report.size}</span></>}
-                </div>
-              </div>
-              <div className={styles.reportDate}>
-                <Clock size={11} />
-                {report.status === 'scheduled' ? 'Scheduled' : report.status === 'processing' ? 'Processing…' : formatDate(report.generated)}
-              </div>
-              <div className={styles.reportActions}>
-                {report.status === 'completed' && (
-                  <>
-                    <button className={styles.actionBtn} title="Preview report" onClick={() => handlePreview(report)}><Eye size={13} /></button>
-                    <button className={styles.actionBtn} title="Download CSV"   onClick={() => handleDownload(report)}><Download size={13} /></button>
-                  </>
-                )}
-                {report.status === 'processing' && <RefreshCw size={14} className={clsx(styles.actionBtn, styles.spinning)} style={{ color:'#F59E0B' }} />}
-                {report.status === 'scheduled'  && <Clock size={14} style={{ color:'var(--text-dim)', padding:8 }} />}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Live Sector Summary</h3>
-        <div className={styles.summaryTable}>
-          <div className={styles.tableHeader}>
-            <span>Sector</span><span>Contracts</span><span>Total Value</span><span>Avg Value</span><span>Share</span>
-          </div>
-          {(sectors ?? []).sort((a, b) => b.total_value - a.total_value).map((s, i) => {
-            const totalVal = sectors?.reduce((acc, x) => acc + x.total_value, 0) ?? 1;
-            const pct      = ((s.total_value / totalVal) * 100).toFixed(1);
-            const avg      = s.count > 0 ? s.total_value / s.count : 0;
-            return (
-              <motion.div key={s.sector} className={styles.tableRow}
-                initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay: i*0.04 }}>
-                <div className={styles.tableSector}>
-                  <span className={styles.tableDot} style={{ background: sectorColor(s.sector) }} />
-                  {sectorLabel(s.sector)}
-                </div>
-                <span className={styles.tableNum}>{formatNumber(s.count)}</span>
-                <span className={styles.tableNum}>{formatCurrency(s.total_value)}</span>
-                <span className={styles.tableNum}>{formatCurrency(avg)}</span>
-                <div className={styles.tableShare}>
-                  <div className={styles.shareBar}>
-                    <div className={styles.shareBarFill} style={{ width:`${pct}%`, background: sectorColor(s.sector) }} />
-                  </div>
-                  <span className={styles.sharePct}>{pct}%</span>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
-
     </div>
   );
 }

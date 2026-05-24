@@ -190,13 +190,19 @@ export default function DataSourcesPage() {
 
   const { data: sources = [] } = useQuery<SourceOption[]>({
     queryKey: ['ingestion-sources'],
-    queryFn:  async () => (await client.get('/ingestion/sources')).data,
+    queryFn:  async () => {
+      const data = (await client.get('/ingestion/sources')).data;
+      return Array.isArray(data) ? data : [];
+    },
     staleTime: Infinity,
   });
 
   const { data: jobs = [], isLoading: jobsLoading, isFetching: jobsFetching, refetch } = useQuery<IngestionJob[]>({
     queryKey: ['ingestion-jobs'],
-    queryFn:  async () => (await client.get('/ingestion/jobs')).data,
+    queryFn:  async () => {
+      const data = (await client.get('/ingestion/jobs')).data;
+      return Array.isArray(data) ? data : [];
+    },
     refetchInterval: 10000,
   });
 

@@ -603,7 +603,7 @@ export default function SettingsPage() {
     setSessionsLoading(true);
     try {
       const res = await apiClient.get('/sessions');
-      setSessions(res.data);
+      setSessions(Array.isArray(res.data) ? res.data : []);
     } catch { /* silently ignore */ }
     finally { setSessionsLoading(false); }
   }, []);
@@ -644,7 +644,7 @@ export default function SettingsPage() {
     setApiKeysLoading(true);
     try {
       const res = await apiClient.get('/api-keys');
-      setApiKeys(res.data);
+      setApiKeys(Array.isArray(res.data) ? res.data : []);
     } catch { /* silently ignore */ }
     finally { setApiKeysLoading(false); }
   }, []);
@@ -688,15 +688,16 @@ export default function SettingsPage() {
   const loadTeams = useCallback(async () => {
     try {
       const res = await apiClient.get('/teams');
-      setTeams(res.data);
-      if (res.data.length > 0 && !selectedTeam) setSelectedTeam(res.data[0]);
+      const data = Array.isArray(res.data) ? res.data : [];
+      setTeams(data);
+      if (data.length > 0 && !selectedTeam) setSelectedTeam(data[0]);
     } catch { /* silently ignore */ }
   }, [selectedTeam]);
 
   const loadInvitations = useCallback(async (teamId: string) => {
     try {
       const res = await apiClient.get(`/teams/${teamId}/invitations`);
-      setInvitations(res.data);
+      setInvitations(Array.isArray(res.data) ? res.data : []);
     } catch { /* silently ignore */ }
   }, []);
 

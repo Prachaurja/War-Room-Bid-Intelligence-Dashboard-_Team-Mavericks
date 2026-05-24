@@ -1087,7 +1087,6 @@ export default function AnalyticsPage() {
           <p className={styles.headingSub}>Deep Dive Analytics into Australian Government Procurement Data</p>
         </div>
         <div className={styles.headerActions}>
-          <button className={styles.ghostBtn}><Filter size={13} /> Filter</button>
           <button className={styles.ghostBtn} onClick={handleFullPageExport}><Download size={13} /> Export PDF</button>
         </div>
       </div>

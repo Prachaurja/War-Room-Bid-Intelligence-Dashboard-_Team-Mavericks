@@ -26,7 +26,7 @@ export default function LoginPage() {
   const totpRef                      = useRef<HTMLInputElement>(null);
   const recoveryRef                  = useRef<HTMLInputElement>(null);
 
-  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+  const API_URL = import.meta.env.VITE_API_URL || '';
 
   // ── Step 1: credentials ───────────────────────────────────
   const handleSubmit = async (e: FormEvent) => {

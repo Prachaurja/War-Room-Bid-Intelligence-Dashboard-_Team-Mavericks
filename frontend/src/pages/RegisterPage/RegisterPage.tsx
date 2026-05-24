@@ -18,7 +18,7 @@ export default function RegisterPage() {
   const { setAuth }             = useAuthStore();
   const navigate                = useNavigate();
 
-  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+  const API_URL = import.meta.env.VITE_API_URL || '';
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e: FormEvent) => {
@@ -59,7 +59,7 @@ export default function RegisterPage() {
       setTimeout(() => navigate('/login'), 900);
 
     } catch {
-      setError('Cannot connect to server. Make sure the backend is running on port 8000.');
+      setError('Cannot connect to server. Make sure the backend is running.');
     } finally {
       setLoading(false);
     }

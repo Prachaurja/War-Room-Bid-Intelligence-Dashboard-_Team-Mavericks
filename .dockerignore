@@ -1,0 +1,13 @@
+.git
+.gitignore
+**/.env
+**/node_modules
+**/dist
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/*.log
+deploy/k8s/secret.yaml
