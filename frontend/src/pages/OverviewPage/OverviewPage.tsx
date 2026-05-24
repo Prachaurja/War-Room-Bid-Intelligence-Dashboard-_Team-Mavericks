@@ -9,7 +9,7 @@ import BidsBySectorChart from '../../components/overview/BidsBySectorChart';
 import RegionalBidChart from '../../components/overview/RegionalBidChart';
 import RecentActivityFeed from '../../components/overview/RecentActivityFeed';
 import SourceBreakdown from '../../components/overview/SourceBreakdown';
-import { useOverviewStats } from '../../hooks/useTenders';
+import { useOverviewStats, useTenders } from '../../hooks/useTenders';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import styles from './OverviewPage.module.css';
 
@@ -22,6 +22,8 @@ const MAX_AGE_MS     = 30 * 24 * 60 * 60 * 1000;
 // ── Time window options ───────────────────────────────────────
 const WINDOWS = [
   { label: '30 min',  ms: 30 * 60 * 1000,           key: '30m' },
+  { label: '6 hrs',   ms: 6  * 60 * 60 * 1000,      key: '6h'  },
+  { label: '12 hrs',  ms: 12 * 60 * 60 * 1000,      key: '12h' },
   { label: '24 hrs',  ms: 24 * 60 * 60 * 1000,      key: '24h' },
   { label: '7 days',  ms: 7  * 24 * 60 * 60 * 1000, key: '7d'  },
   { label: '30 days', ms: 30 * 24 * 60 * 60 * 1000, key: '30d' },
@@ -63,7 +65,9 @@ function findClosestEntry(history: HistoryEntry[], targetMs: number, nowMs: numb
   let best: HistoryEntry | null = null;
   let bestDiff = Infinity;
   for (const entry of history) {
-    const diff = Math.abs(new Date(entry.ts).getTime() - targetTime);
+    const entryTime = new Date(entry.ts).getTime();
+    if (entryTime > targetTime) continue;
+    const diff = Math.abs(entryTime - targetTime);
     if (diff < bestDiff) {
       bestDiff = diff;
       best     = entry;
@@ -82,6 +86,7 @@ function pctChange(current: number | undefined, previous: number | undefined): n
 // ── Component ─────────────────────────────────────────────────
 export default function OverviewPage() {
   const { data: stats, isLoading } = useOverviewStats();
+  const { data: periodTenderData, isLoading: periodLoading } = useTenders({ page: 1, page_size: 1000 });
   const [windowKey, setWindowKey]  = useState<WindowKey>('30m');
   const [history, setHistory]      = useState<HistoryEntry[]>(() => readHistory());
   const [comparisonClockMs, setComparisonClockMs] = useState<number | null>(null);
@@ -119,6 +124,40 @@ export default function OverviewPage() {
 
   // Find comparison snapshot for selected window
   const selectedWindow = WINDOWS.find(w => w.key === windowKey)!;
+  const periodStats = useMemo(() => {
+    if (comparisonClockMs == null || !periodTenderData?.items) return null;
+    const startTime = comparisonClockMs - selectedWindow.ms;
+    const tenders = periodTenderData.items.filter((tender) => {
+      const rawDate = tender.created_at ?? tender.published_date ?? tender.close_date;
+      if (!rawDate) return false;
+      const normalized = /[Z+-]\d{2}:?\d{2}$|Z$/.test(rawDate) ? rawDate : rawDate + 'Z';
+      const time = new Date(normalized).getTime();
+      return Number.isFinite(time) && time >= startTime && time <= comparisonClockMs;
+    });
+    const totalValue = tenders.reduce((sum, tender) => sum + (tender.contract_value ?? 0), 0);
+    const byStatusValue = (status: string) =>
+      tenders
+        .filter(tender => tender.status === status)
+        .reduce((sum, tender) => sum + (tender.contract_value ?? 0), 0);
+
+    return {
+      total_tenders: tenders.length,
+      active_tenders: tenders.filter(tender => tender.status === 'active').length,
+      closed_tenders: tenders.filter(tender => tender.status === 'closed').length,
+      upcoming_tenders: tenders.filter(tender => tender.status === 'upcoming').length,
+      total_value: totalValue,
+      avg_value: tenders.length ? totalValue / tenders.length : 0,
+      active_value: byStatusValue('active'),
+      closed_value: byStatusValue('closed'),
+      upcoming_value: byStatusValue('upcoming'),
+      sources: tenders.reduce<Record<string, number>>((acc, tender) => {
+        const key = tender.source_name || 'Unknown';
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      }, {}),
+    };
+  }, [comparisonClockMs, periodTenderData?.items, selectedWindow.ms]);
+  const displayStats = periodStats ?? stats;
   const baseline       = useMemo(
     () =>
       comparisonClockMs == null
@@ -129,11 +168,11 @@ export default function OverviewPage() {
 
   // Compute live changes — always a number, 0 when no history
   const changes = useMemo(() => ({
-    total_value:    pctChange(stats?.total_value,    baseline?.total_value),
-    total_tenders:  pctChange(stats?.total_tenders,  baseline?.total_tenders),
-    active_tenders: pctChange(stats?.active_tenders, baseline?.active_tenders),
-    closed_tenders: pctChange(stats?.closed_tenders, baseline?.closed_tenders),
-  }), [stats, baseline]);
+    total_value:    pctChange(displayStats?.total_value,    baseline?.total_value),
+    total_tenders:  pctChange(displayStats?.total_tenders,  baseline?.total_tenders),
+    active_tenders: pctChange(displayStats?.active_tenders, baseline?.active_tenders),
+    closed_tenders: pctChange(displayStats?.closed_tenders, baseline?.closed_tenders),
+  }), [displayStats, baseline]);
 
   // How old is the baseline
   const baselineAge = useMemo(() => {
@@ -150,25 +189,25 @@ export default function OverviewPage() {
   const statCards = [
     {
       title:    'Total Tender Value',
-      value:    formatCurrency(stats?.total_value),
-      sub:      `Avg ${formatCurrency(stats?.avg_value)} Per Tender`,
+      value:    formatCurrency(displayStats?.total_value),
+      sub:      `Avg ${formatCurrency(displayStats?.avg_value)} Per Tender`,
       icon:     DollarSign,
       gradient: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
       change:   changes.total_value,
     },
     {
       title:    'Total Tender Bids',
-      value:    formatNumber(stats?.total_tenders),
-      sub:      `Across ${Object.keys(stats?.sources ?? {}).length} Data Sources`,
+      value:    formatNumber(displayStats?.total_tenders),
+      sub:      `Across ${Object.keys(displayStats?.sources ?? {}).length} Data Sources`,
       icon:     Layers,
       gradient: 'linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%)',
       change:   changes.total_tenders,
     },
     {
       title:    'Active Bids',
-      value:    formatNumber(stats?.active_tenders ?? 0),
-      sub:      stats?.upcoming_tenders
-        ? `+ ${formatNumber(stats.upcoming_tenders)} Upcoming`
+      value:    formatNumber(displayStats?.active_tenders ?? 0),
+      sub:      displayStats?.upcoming_tenders
+        ? `+ ${formatNumber(displayStats.upcoming_tenders)} Upcoming`
         : 'Live procurement opportunities',
       icon:     Activity,
       gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
@@ -176,7 +215,7 @@ export default function OverviewPage() {
     },
     {
       title:    'Closed Bids',
-      value:    formatNumber(stats?.closed_tenders),
+      value:    formatNumber(displayStats?.closed_tenders),
       sub:      'Historical Awarded Contracts',
       icon:     CheckCircle2,
       gradient: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
@@ -193,8 +232,8 @@ export default function OverviewPage() {
           <Clock size={13} style={{ color: 'var(--text-dim)' }} />
           <span className={styles.statGridLabelText}>
             {baseline
-              ? `Comparing vs ${baselineAge}`
-              : 'No historical data yet — builds after first 30 min'}
+              ? `Showing ${selectedWindow.label}; compared vs ${baselineAge}`
+              : `Showing tenders added in the last ${selectedWindow.label}`}
           </span>
         </div>
         <div className={styles.windowPicker}>
@@ -213,7 +252,7 @@ export default function OverviewPage() {
       {/* ── Stat cards ── */}
       <div className={styles.statGrid}>
         {statCards.map((card, i) => (
-          <StatCard key={card.title} {...card} loading={isLoading} delay={i * 0.07} />
+          <StatCard key={card.title} {...card} loading={isLoading || periodLoading} delay={i * 0.07} />
         ))}
       </div>
 
