@@ -24,6 +24,11 @@ function getStoredThemeMode(): ThemeMode {
     : 'system';
 }
 
+function getInitialSidebarOpen(): boolean {
+  if (typeof window === 'undefined') return true;
+  return !window.matchMedia('(max-width: 768px)').matches;
+}
+
 interface UIStore {
   sidebarOpen: boolean;
   activePage: string;
@@ -40,7 +45,7 @@ interface UIStore {
 const THEME_MODE_SEQUENCE: ThemeMode[] = ['system', 'dark', 'light'];
 
 export const useUIStore = create<UIStore>((set) => ({
-  sidebarOpen: true,
+  sidebarOpen: getInitialSidebarOpen(),
   activePage: 'overview',
   themeMode: getStoredThemeMode(),
   resolvedTheme: getSystemTheme(),

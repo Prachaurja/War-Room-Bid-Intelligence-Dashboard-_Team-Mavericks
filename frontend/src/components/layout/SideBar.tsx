@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Home, Gavel, BarChart3, FileText,
   Bell, LogOut, Settings, ChevronRight,
-  Target, Wifi, HardDrive,
+  Target, Wifi, HardDrive, PanelLeftClose,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUIStore } from '../../store/ui.store';
@@ -14,7 +14,7 @@ import styles from './SideBar.module.css';
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
-  const { sidebarOpen }  = useUIStore();
+  const { sidebarOpen, setSidebarOpen }  = useUIStore();
   const location         = useLocation();
   const navigate         = useNavigate();
   const { status, newTenders, newAlerts } = useWebSocket();
@@ -26,6 +26,12 @@ export default function Sidebar() {
   const isConnected  = status === 'connected';
   const isConnecting = status === 'connecting';
   const hasNewData   = newTenders > 0;
+
+  const closeOnMobileNavigation = () => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) {
+      setSidebarOpen(false);
+    }
+  };
 
   const NAV_ITEMS = [
     { label: 'Home',         path: '/',             icon: Home,            badge: null },
@@ -131,6 +137,7 @@ export default function Sidebar() {
                 <NavLink
                   key={item.path}
                   to={item.path}
+                  onClick={closeOnMobileNavigation}
                   className={clsx(styles.navItem, isActive && styles.navItemActive)}
                 >
                   {isActive && (
@@ -160,6 +167,18 @@ export default function Sidebar() {
           </nav>
 
           <div className={styles.spacer} />
+          <div className={styles.collapseRow}>
+            <button
+              className={styles.collapseBtn}
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose size={15} />
+            </button>
+          </div>
+
           <div className={styles.divider} />
 
           <div className={styles.systemLinks}>
@@ -167,6 +186,7 @@ export default function Sidebar() {
               className={clsx(styles.systemItem, location.pathname === '/settings' && styles.systemItemActive)}
               onClick={() => {
                 navigate('/settings');
+                closeOnMobileNavigation();
               }}
             >
               <Settings size={15} />

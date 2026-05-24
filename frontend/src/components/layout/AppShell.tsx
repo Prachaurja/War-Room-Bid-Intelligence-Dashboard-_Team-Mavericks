@@ -10,6 +10,7 @@ export default function AppShell() {
   const { sidebarOpen } = useUIStore();
   const location = useLocation();
   const contentRef = useRef<HTMLElement>(null);
+  const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
   useBrowserAlertNotifications();
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function AppShell() {
       <Sidebar />
       <div
         className={styles.main}
-        style={{ marginLeft: sidebarOpen ? 'var(--sidebar-width)' : '0' }}
+        style={{ marginLeft: sidebarOpen && !isMobile ? 'var(--sidebar-width)' : '0' }}
       >
         <TopBar pathname={location.pathname} />
         <main className={styles.content} ref={contentRef}>
