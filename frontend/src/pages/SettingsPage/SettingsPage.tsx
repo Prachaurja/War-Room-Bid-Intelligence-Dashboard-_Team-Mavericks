@@ -37,7 +37,7 @@ const INVITE_STATUS_CLASS: Record<string, string> = {
 const SECTIONS = [
   { id: 'profile',      label: 'Profile',             icon: User,              group: 'Account'      },
   { id: 'security',     label: 'Security',            icon: Shield,            group: 'Account'     },
-  { id: 'team',         label: 'Team & Access',       icon: Users,             group: 'Account'     },
+  { id: 'team',         label: 'Team & Access',       icon: Users,             group: 'Account', hidden: true },
   { id: 'appearance',   label: 'Appearance',          icon: Palette,           group: 'Preferences' },
   { id: 'notification',        label: 'Notification',        icon: Bell,              group: 'Preferences'      },
   { id: 'tender-prefs', label: 'Tender Preferences',  icon: SlidersHorizontal, group: 'Preferences' },
@@ -151,9 +151,11 @@ interface PasswordModalProps {
   onCancel:  () => void;
   loading:   boolean;
   error:     string;
+  title?:    string;
+  subtitle?: string;
 }
 
-function PasswordVerifyModal({ onConfirm, onCancel, loading, error }: PasswordModalProps) {
+function PasswordVerifyModal({ onConfirm, onCancel, loading, error, title = 'Verify Your Password', subtitle = 'Enter Your Password to View Recovery Codes' }: PasswordModalProps) {
   const [pw,      setPw]      = useState('');
   const [showPw,  setShowPw]  = useState(false);
   const inputRef              = useRef<HTMLInputElement>(null);
@@ -180,8 +182,8 @@ function PasswordVerifyModal({ onConfirm, onCancel, loading, error }: PasswordMo
       >
         <div className={styles.modalHeader}>
           <div>
-            <h3 className={styles.modalTitle}>Verify Your Password</h3>
-            <p className={styles.modalSub}>Enter Your Password to View Recovery Codes</p>
+            <h3 className={styles.modalTitle}>{title}</h3>
+            <p className={styles.modalSub}>{subtitle}</p>
           </div>
           <button className={styles.modalClose} onClick={onCancel}><X size={16} /></button>
         </div>
@@ -433,7 +435,25 @@ export default function SettingsPage() {
   const [pwModalLoading, setPwModalLoading] = useState(false);
   const [pwModalError,   setPwModalError]   = useState('');
   // Whether the modal was triggered for "view" vs "regenerate"
-  const [pwModalIntent, setPwModalIntent]   = useState<'view' | 'regen'>('view');
+  const [pwModalIntent, setPwModalIntent]   = useState<'view' | 'regen' | 'clearHistory' | 'resetPrefs'>('view');
+  const passwordModalCopy = {
+    view: {
+      title: 'Verify Your Password',
+      subtitle: 'Enter Your Password to View Recovery Codes',
+    },
+    regen: {
+      title: 'Verify Your Password',
+      subtitle: 'Enter Your Password to Regenerate Recovery Codes',
+    },
+    clearHistory: {
+      title: 'Clear Trend History?',
+      subtitle: 'Enter Your Password Before Clearing Local Tender Trend History',
+    },
+    resetPrefs: {
+      title: 'Reset Preferences?',
+      subtitle: 'Enter Your Password Before Resetting Local Preferences',
+    },
+  }[pwModalIntent];
 
   const load2faStatus = useCallback(async () => {
     setTotpStatusLoading(true);
@@ -523,6 +543,12 @@ export default function SettingsPage() {
     setShowPwModal(true);
   };
 
+  const openProtectedActionModal = (intent: 'clearHistory' | 'resetPrefs') => {
+    setPwModalIntent(intent);
+    setPwModalError('');
+    setShowPwModal(true);
+  };
+
   const handlePasswordModalConfirm = async (password: string) => {
     setPwModalLoading(true);
     setPwModalError('');
@@ -565,9 +591,13 @@ export default function SettingsPage() {
           // No codes in memory — user needs to regenerate to see them
           toast.info('Recovery codes are not stored after initial setup. Click Regenerate to get a new set.');
         }
-      } else {
+      } else if (pwModalIntent === 'regen') {
         // Regenerate
         await doRegenerate();
+      } else if (pwModalIntent === 'clearHistory') {
+        clearHistory();
+      } else if (pwModalIntent === 'resetPrefs') {
+        resetAllPrefs();
       }
 
     } catch {
@@ -758,6 +788,8 @@ export default function SettingsPage() {
             onCancel={() => { setShowPwModal(false); setPwModalError(''); }}
             loading={pwModalLoading}
             error={pwModalError}
+            title={passwordModalCopy.title}
+            subtitle={passwordModalCopy.subtitle}
           />
         )}
       </AnimatePresence>
@@ -777,7 +809,7 @@ export default function SettingsPage() {
           {GROUPS.map(group => (
             <div key={group} className={styles.navGroup}>
               <p className={styles.navGroupLabel}>{group}</p>
-              {SECTIONS.filter(s => s.group === group).map(section => (
+              {SECTIONS.filter(s => s.group === group && !('hidden' in s && s.hidden)).map(section => (
                 <button
                   key={section.id}
                   className={`${styles.navItem} ${activeSection === section.id ? styles.navItemActive : ''}`}
@@ -905,8 +937,8 @@ export default function SettingsPage() {
                 <>
                   <div className={styles.sectionHeader}><Trash2 size={18} className={styles.sectionIcon} /><div><h3 className={styles.sectionTitle}>Data & Privacy</h3><p className={styles.sectionSub}>Manage Your Local Data and Preferences</p></div></div>
                   {[
-                    { title: 'Clear Trend History',   sub: 'Removes the 30-Day Stats History Used for Change Indicators on the Overview Page.', icon: Clock,     btn: 'Clear History', color: '#F59E0B', action: clearHistory  },
-                    { title: 'Reset All Preferences', sub: 'Resets Tender Filters, Display Preferences to Defaults. Page Will Reload.',         icon: RefreshCw, btn: 'Reset',         color: '#3B82F6', action: resetAllPrefs },
+                    { title: 'Clear Trend History',   sub: 'Removes the 30-Day Stats History Used for Change Indicators on the Overview Page.', icon: Clock,     btn: 'Clear History', color: '#F59E0B', action: () => openProtectedActionModal('clearHistory') },
+                    { title: 'Reset All Preferences', sub: 'Resets Tender Filters, Display Preferences to Defaults. Page Will Reload.',         icon: RefreshCw, btn: 'Reset',         color: '#3B82F6', action: () => openProtectedActionModal('resetPrefs') },
                     { title: 'Export My Data',        sub: 'Download a JSON File of Your Settings, Preferences, and Profile.',                  icon: Download,  btn: 'Export',        color: '#10B981', action: exportData    },
                   ].map(item => (
                     <div key={item.title} className={styles.card}>
