@@ -601,6 +601,7 @@ export default function TendersPage() {
       'Close Date',
       'Status',
       'Source',
+      'Source ID',
     ];
     const rows = sortedItems.map((t) => [
       csvEscape(t.title),
@@ -611,6 +612,7 @@ export default function TendersPage() {
       t.close_date ?? '',
       t.status,
       t.source_name ?? '',
+      t.source_id ?? '',
     ]);
     const csv = [headers, ...rows].map((r) => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

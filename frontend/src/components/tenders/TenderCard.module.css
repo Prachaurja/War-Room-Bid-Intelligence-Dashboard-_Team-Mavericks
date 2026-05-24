@@ -70,17 +70,43 @@
   .status_upcoming { background: rgba(59,130,246,0.12);  color: #60A5FA; border-color: rgba(59,130,246,0.25); }
   .status_closed   { background: rgba(107,114,128,0.12); color: #9CA3AF; border-color: rgba(107,114,128,0.25); }
   
+  .titleRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+    min-width: 0;
+  }
+
   .title {
+    flex: 0 1 auto;
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
     line-height: 1.4;
-    margin-bottom: 6px;
+    margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .sourceIdBadge {
+    flex-shrink: 0;
+    max-width: 180px;
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-dim);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .description {

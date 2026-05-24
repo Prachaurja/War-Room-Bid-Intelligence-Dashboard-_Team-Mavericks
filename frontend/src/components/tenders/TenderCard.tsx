@@ -48,7 +48,14 @@ export default function TenderCard({ tender, index, onSelect }: TenderCardProps)
         </div>
 
         {/* Title */}
-        <h4 className={styles.title}>{tender.title}</h4>
+        <div className={styles.titleRow}>
+          <h4 className={styles.title}>{tender.title}</h4>
+          {tender.source_id && (
+            <span className={styles.sourceIdBadge} title={`Source ID: ${tender.source_id}`}>
+              {tender.source_id}
+            </span>
+          )}
+        </div>
 
         {/* Description */}
         {tender.description && (
