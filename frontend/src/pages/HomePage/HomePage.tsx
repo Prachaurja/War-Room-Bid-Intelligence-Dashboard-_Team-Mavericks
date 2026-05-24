@@ -26,6 +26,7 @@ const SOURCE_CONFIG: Record<string, {
   qld_tenders: { label: 'QLD Tenders', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  icon: Database, desc: 'Queensland Government Tenders' },
   nsw_etender: { label: 'NSW eTender', color: '#3B82F6', bg: 'rgba(59,130,246,0.1)',  icon: Database, desc: 'New South Wales eTendering' },
   vic_tenders: { label: 'VIC Tenders', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)',   icon: Database, desc: 'Victorian Government Tenders' },
+  buying_for_victoria: { label: 'Buying for Victoria', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', icon: Database, desc: 'Buying for Victoria' },
   wa_tenders:  { label: 'WA Tenders',  color: '#EC4899', bg: 'rgba(236,72,153,0.1)',  icon: Database, desc: 'Western Australian Tenders' },
   sa_tenders:  { label: 'SA Tenders',  color: '#10B981', bg: 'rgba(16,185,129,0.1)',  icon: Database, desc: 'South Australian Tenders' },
   tas_tenders: { label: 'TAS Tenders', color: '#84CC16', bg: 'rgba(132,204,22,0.1)',  icon: Database, desc: 'Tasmanian Government Tenders' },
