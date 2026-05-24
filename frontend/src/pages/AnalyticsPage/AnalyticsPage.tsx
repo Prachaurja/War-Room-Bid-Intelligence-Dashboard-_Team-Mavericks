@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, ScatterChart, Scatter, ZAxis,
 } from 'recharts';
 import {
-  Download, Filter, TrendingUp, BarChart3,
+  Download, TrendingUp, BarChart3,
   Activity, Building2, Clock,
   DollarSign, Layers,
   Target, Users,
@@ -26,6 +26,7 @@ import { sectorLabel, sectorColor } from '../../utils/tender.utils';
 import styles from './AnalyticsPage.module.css';
 import clsx from 'clsx';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 
 // Constants
 const STATE_COLORS: Record<string, string> = {
@@ -71,6 +72,38 @@ const escapeHtml = (value: unknown) =>
 
 const barWidth = (value: number, max: number) =>
   `${Math.max(4, Math.min(100, max > 0 ? (value / max) * 100 : 0))}%`;
+
+const stateDistributionSvg = (
+  data: StateChartDatum[],
+  metric: 'count' | 'value',
+  max: number,
+) => {
+  const rowHeight = 30;
+  const labelX = 8;
+  const barX = 72;
+  const barMaxWidth = 360;
+  const valueX = 452;
+  const width = 560;
+  const height = Math.max(64, data.length * rowHeight + 16);
+  const rows = data.map((state, index) => {
+    const y = 12 + index * rowHeight;
+    const value = metric === 'count' ? state.count : state.total_value;
+    const barW = Math.max(6, Math.min(barMaxWidth, max > 0 ? (value / max) * barMaxWidth : 0));
+    const label = metric === 'count' ? formatNumber(value) : formatCurrency(value);
+    return `
+      <text x="${labelX}" y="${y + 13}" font-size="12" font-weight="700" fill="#111827">${escapeHtml(state.state)}</text>
+      <rect x="${barX}" y="${y}" width="${barMaxWidth}" height="14" rx="7" fill="#eef2ff"></rect>
+      <rect x="${barX}" y="${y}" width="${barW}" height="14" rx="7" fill="${state.fill}"></rect>
+      <text x="${valueX}" y="${y + 13}" font-size="11" font-weight="700" fill="#111827">${escapeHtml(label)}</text>
+    `;
+  }).join('');
+
+  return `
+    <svg class="printStateChartSvg" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img">
+      ${rows}
+    </svg>
+  `;
+};
 
 function heatColor(value: number, max: number): string {
   if (value === 0 || max === 0) return 'rgba(255,255,255,0.03)';
@@ -234,13 +267,16 @@ function WinWindowChart({ data }: { data: WinWindowData }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-        {data.data.map((month: Record<string, string | number>) => {
+        {data.data.map((month: Record<string, string | number>, i: number) => {
           const total = (data.sectors ?? []).reduce((s: number, sec: string) => s + ((month[sec] as number) ?? 0), 0);
+          const color = DEPT_COLORS[i % DEPT_COLORS.length];
           return (
             <div key={String(month.month)} style={{
-              flex: 1, background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)',
+              flex: 1,
+              background: `linear-gradient(135deg, ${color}1F, var(--bg-elevated) 72%)`,
+              border: `1px solid ${color}45`,
               borderRadius: 12, padding: '12px 16px', textAlign: 'center',
+              boxShadow: `inset 0 1px 0 ${color}18`,
             }}>
               <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 4px' }}>{String(month.month)}</p>
               <p style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{total}</p>
@@ -373,7 +409,7 @@ const ChartCard = ({
   </motion.div>
 );
 
-const ViewportChart = ({ height = 300, children }: { height?: number; children: ReactNode }) => {
+const ViewportChart = ({ height = 300, forceRender = false, children }: { height?: number; forceRender?: boolean; children: ReactNode }) => {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '220px 0px' });
   const [shouldRender, setShouldRender] = useState(false);
@@ -397,12 +433,12 @@ const ViewportChart = ({ height = 300, children }: { height?: number; children: 
 
   return (
     <div ref={ref}>
-      {shouldRender ? children : <Shimmer h={height} />}
+      {forceRender || shouldRender ? children : <Shimmer h={height} />}
     </div>
   );
 };
 
-const ViewportGate = ({ children }: { children: (ready: boolean) => ReactNode }) => {
+const ViewportGate = ({ forceRender = false, children }: { forceRender?: boolean; children: (ready: boolean) => ReactNode }) => {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '220px 0px' });
   const [shouldRender, setShouldRender] = useState(false);
@@ -426,7 +462,7 @@ const ViewportGate = ({ children }: { children: (ready: boolean) => ReactNode })
 
   return (
     <div ref={ref} className={styles.chartsRow2}>
-      {children(shouldRender)}
+      {children(forceRender || shouldRender)}
     </div>
   );
 };
@@ -434,7 +470,12 @@ const ViewportGate = ({ children }: { children: (ready: boolean) => ReactNode })
 // Page
 export default function AnalyticsPage() {
   const [activeMetric, setActiveMetric] = useState<'count' | 'value'>('count');
+  const [isPreparingPdf, setIsPreparingPdf] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+  const pdfStateRef = useRef<{
+    stateLoading: boolean;
+    stateChartData: StateChartDatum[];
+  }>({ stateLoading: true, stateChartData: [] });
   // Data hooks
   const { data: sectorData,    isLoading: sectorLoading    } = useSectorStats();
   const { data: stateData,     isLoading: stateLoading     } = useStateStats();
@@ -458,6 +499,10 @@ export default function AnalyticsPage() {
     .filter(d => d.state && d.state !== 'Unknown')
     .sort((a, b) => b.count - a.count).slice(0, 9)
     .map(d => ({ state: d.state, count: d.count, total_value: d.total_value, fill: STATE_COLORS[d.state] ?? '#6B7280' })), [stateData]);
+
+  useEffect(() => {
+    pdfStateRef.current = { stateLoading, stateChartData };
+  }, [stateLoading, stateChartData]);
 
   const topSectors = useMemo(() => [...sectorChartData].sort((a, b) => b.total_value - a.total_value).slice(0, 5), [sectorChartData]);
   const statusChartData = useMemo(() => (statusData ?? []).map(s => ({ ...s, label: s.status.charAt(0).toUpperCase() + s.status.slice(1), fill: STATUS_COLORS[s.status] ?? '#6B7280' })), [statusData]);
@@ -764,12 +809,35 @@ export default function AnalyticsPage() {
 
   void handleExport;
 
-  const handleFullPageExport = () => {
-    const reportNode = pageRef.current;
-    if (!reportNode) return;
+  const handleFullPageExport = async () => {
+    flushSync(() => setIsPreparingPdf(true));
 
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    if (!printWindow) {
+      setIsPreparingPdf(false);
+      return;
+    }
+
+    await new Promise(resolve => window.setTimeout(resolve, 180));
+    await new Promise<void>((resolve) => {
+      const startedAt = Date.now();
+      const tick = () => {
+        const { stateLoading: waitingForState, stateChartData: latestStateData } = pdfStateRef.current;
+        if (!waitingForState || latestStateData.length > 0 || Date.now() - startedAt > 2500) {
+          resolve();
+          return;
+        }
+        window.setTimeout(tick, 50);
+      };
+      tick();
+    });
+
+    const reportNode = pageRef.current;
+    if (!reportNode) {
+      setIsPreparingPdf(false);
+      printWindow.close();
+      return;
+    }
 
     const stylesheets = Array.from(
       document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>('link[rel="stylesheet"], style'),
@@ -784,25 +852,45 @@ export default function AnalyticsPage() {
     clonedReport.style.width = `${reportWidth}px`;
     clonedReport.style.maxWidth = 'none';
     clonedReport.querySelectorAll('button').forEach((button) => button.remove());
-    const stateCountMax = Math.max(1, ...stateChartData.map((state) => state.count));
-    const stateValueMax = Math.max(1, ...stateChartData.map((state) => state.total_value));
-    const stateDistributionPrint = stateChartData.map((state) => `
-      <div class="printStateRow">
-        <span class="printStateName">${escapeHtml(state.state)}</span>
-        <div class="printStateBars">
-          <div class="printStateMetric">
-            <span>Count</span>
-            <div class="printStateTrack"><div style="width:${barWidth(state.count, stateCountMax)}; background:${state.fill}"></div></div>
-            <strong>${formatNumber(state.count)}</strong>
+    const exportStateData = pdfStateRef.current.stateChartData.length
+      ? pdfStateRef.current.stateChartData
+      : stateChartData;
+    const stateCountMax = Math.max(1, ...exportStateData.map((state) => state.count));
+    const stateValueMax = Math.max(1, ...exportStateData.map((state) => state.total_value));
+    const stateCountChart = stateDistributionSvg(exportStateData, 'count', stateCountMax);
+    const stateValueChart = stateDistributionSvg(exportStateData, 'value', stateValueMax);
+    const stateDistributionPrintSection = `
+      <section class="printStateBothModes">
+        <h2>State Distribution: Count and Value</h2>
+        <p>Both modes are included for PDF export.</p>
+        <div class="printStateColumns">
+          <div class="printStatePanel">
+            <h3>Count</h3>
+            ${exportStateData.length ? stateCountChart : '<p>No state count data</p>'}
           </div>
-          <div class="printStateMetric">
-            <span>Value</span>
-            <div class="printStateTrack"><div style="width:${barWidth(state.total_value, stateValueMax)}; background:${state.fill}"></div></div>
-            <strong>${formatCurrency(state.total_value)}</strong>
+          <div class="printStatePanel">
+            <h3>Value</h3>
+            ${exportStateData.length ? stateValueChart : '<p>No state value data</p>'}
           </div>
         </div>
-      </div>
-    `).join('');
+      </section>
+    `;
+    const stateTemplate = document.createElement('template');
+    stateTemplate.innerHTML = stateDistributionPrintSection.trim();
+    let replacedStateDistribution = false;
+    clonedReport.querySelectorAll('h3').forEach((heading) => {
+      if (heading.textContent?.trim() === 'Agency Frequency') {
+        heading.closest<HTMLElement>('[class*="chartCard"]')?.setAttribute('data-print-card', 'agency-frequency');
+      }
+      if (heading.textContent?.trim() === 'State Distribution') {
+        const card = heading.closest<HTMLElement>('[class*="chartCard"]');
+        const replacement = stateTemplate.content.firstElementChild?.cloneNode(true);
+        if (card && replacement) {
+          card.replaceWith(replacement);
+          replacedStateDistribution = true;
+        }
+      }
+    });
 
     const html = `
       <!doctype html>
@@ -923,10 +1011,10 @@ export default function AnalyticsPage() {
               color: var(--text-dim) !important;
             }
             .printStateBothModes {
-              width: ${reportWidth}px;
-              max-width: ${reportWidth}px;
+              width: 100%;
+              max-width: 100%;
               margin-top: 10px;
-              padding: 12px;
+              padding: 16px;
               border: 1px solid var(--card-border);
               border-radius: var(--radius-lg);
               background: var(--card-bg);
@@ -944,49 +1032,36 @@ export default function AnalyticsPage() {
               font-size: 12px;
               color: var(--text-dim);
             }
-            .printStateRow {
+            .printStateColumns {
               display: grid;
-              grid-template-columns: 64px minmax(0, 1fr);
-              gap: 10px;
-              align-items: center;
-              padding: 6px 0;
-              border-top: 1px solid var(--border);
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 16px;
+              align-items: start;
             }
-            .printStateRow:first-of-type {
-              border-top: 0;
-            }
-            .printStateName {
-              font-size: 12px;
-              font-weight: 700;
-              color: var(--text-primary);
-            }
-            .printStateBars {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 12px;
-            }
-            .printStateMetric {
-              display: grid;
-              grid-template-columns: 42px minmax(0, 1fr) 76px;
-              gap: 8px;
-              align-items: center;
-              font-size: 11px;
-              color: var(--text-dim);
-            }
-            .printStateMetric strong {
-              color: var(--text-primary);
-              text-align: right;
-              font-variant-numeric: tabular-nums;
-            }
-            .printStateTrack {
-              height: 7px;
-              border-radius: 99px;
+            .printStatePanel {
+              padding: 12px;
+              border: 1px solid var(--border);
+              border-radius: var(--radius-md);
               background: var(--bg-elevated);
-              overflow: hidden;
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
-            .printStateTrack div {
-              height: 100%;
-              border-radius: inherit;
+            .analyticsPrintRoot .printStateBothModes {
+              grid-column: 1 / -1;
+            }
+            .analyticsPrintRoot [data-print-card="agency-frequency"] {
+              grid-column: 1 / -1;
+            }
+            .printStatePanel h3 {
+              margin: 0 0 8px;
+              font-size: 12px;
+              color: var(--text-primary);
+            }
+            .printStateChartSvg {
+              display: block;
+              width: 100%;
+              height: auto;
+              overflow: visible;
             }
             .analyticsPrintRoot svg {
               max-width: none !important;
@@ -1034,8 +1109,8 @@ export default function AnalyticsPage() {
                 margin-top: 0 !important;
               }
               .printStateBothModes {
-                width: ${reportWidth}px !important;
-                max-width: ${reportWidth}px !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 margin-top: 18px !important;
               }
             }
@@ -1053,17 +1128,13 @@ export default function AnalyticsPage() {
                   <div class="printDate">Generated ${new Date().toLocaleString('en-AU')}</div>
                 </header>
                 <section class="analyticsPrintRoot">${clonedReport.outerHTML}</section>
-                <section class="printStateBothModes">
-                  <h2>State Distribution: Count and Value</h2>
-                  <p>Both modes are included for PDF export.</p>
-                  ${stateDistributionPrint || '<p>No state distribution data</p>'}
-                </section>
+                ${replacedStateDistribution ? '' : stateDistributionPrintSection}
               </div>
             </main>
           </div>
           <script>
             window.addEventListener('load', () => {
-              setTimeout(() => window.print(), 800);
+              setTimeout(() => window.print(), 250);
             });
           </script>
         </body>
@@ -1073,6 +1144,7 @@ export default function AnalyticsPage() {
     printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
+    setIsPreparingPdf(false);
   };
 
   void handleFullPageExport;
@@ -1107,7 +1179,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Row 1: Status + Closing Soon */}
-      <ViewportGate>
+      <ViewportGate forceRender={isPreparingPdf}>
         {(rowReady) => (
           <>
         <ChartCard delay={0.08}>
@@ -1144,7 +1216,7 @@ export default function AnalyticsPage() {
             <Target size={11} /> Next 90 days
           </div>
         </div>
-        <ViewportChart height={260}>
+        <ViewportChart height={260} forceRender={isPreparingPdf}>
         {winLoading ? <Shimmer h={260} /> : !winWindow?.data?.length ? <Empty label="No tenders closing in the next 90 days" /> : (
           <WinWindowChart data={winWindow} />
         )}
@@ -1159,7 +1231,7 @@ export default function AnalyticsPage() {
             <p className={styles.chartSub}>Tender Activity by Sector and State - Darker = More Tenders</p>
           </div>
         </div>
-          <ViewportChart height={280}>
+          <ViewportChart height={280} forceRender={isPreparingPdf}>
           {heatLoading ? <Shimmer h={280} /> : !heatmap?.sectors?.length ? <Empty label="No heatmap data" /> : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 3, tableLayout: 'auto' }}>
@@ -1205,7 +1277,7 @@ export default function AnalyticsPage() {
             <div><h3 className={styles.chartTitle}>Agency Frequency</h3><p className={styles.chartSub}>Top 15 Agencies by Tender Count - Spot Repeat Clients</p></div>
             <div className={styles.pill}><Users size={11} /> Top 15</div>
           </div>
-          <ViewportChart height={340}>
+          <ViewportChart height={340} forceRender={isPreparingPdf}>
           {agencyLoading ? <Shimmer h={340} /> : !agencyFreq?.length ? <Empty label="No agency data" /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               {(agencyFreq ?? []).map((a, i) => {
@@ -1242,7 +1314,7 @@ export default function AnalyticsPage() {
               <button className={clsx(styles.toggleBtn, activeMetric === 'value' && styles.toggleBtnActive)} onClick={() => setActiveMetric('value')}>Value</button>
             </div>
           </div>
-          <ViewportChart height={300}>
+          <ViewportChart height={300} forceRender={isPreparingPdf}>
           {stateLoading ? <Shimmer h={300} /> : (
             <StateDistributionChart data={stateChartData} activeMetric={activeMetric} />
           )}
@@ -1259,7 +1331,7 @@ export default function AnalyticsPage() {
           </div>
           <div className={styles.pill}><DollarSign size={11} /> {scatterPoints.length} tenders with value</div>
         </div>
-        <ViewportChart height={300}>
+        <ViewportChart height={300} forceRender={isPreparingPdf}>
         {scatterLoading ? <Shimmer h={300} /> : !scatterPoints.length ? <Empty label="No upcoming tenders with contract value" /> : (
           <TenderValueScatterChart data={scatterPoints} />
         )}
@@ -1275,7 +1347,7 @@ export default function AnalyticsPage() {
           </div>
           <div className={styles.pill}>All Sectors</div>
         </div>
-        <ViewportChart height={280}>
+        <ViewportChart height={280} forceRender={isPreparingPdf}>
         {sectorStatusLoading ? <Shimmer h={280} /> : !sectorStatus?.length ? <Empty label="No sector data" /> : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16, padding: '8px 0' }}>
             {sectorStatus.map(s => {
@@ -1342,7 +1414,7 @@ export default function AnalyticsPage() {
           </div>
           <div className={styles.pill}>All States</div>
         </div>
-        <ViewportChart height={320}>
+        <ViewportChart height={320} forceRender={isPreparingPdf}>
         {treemapLoading ? <Shimmer h={320} /> : !treemapData?.length ? <Empty label="No treemap data" /> : (() => {
           // Build nested structure: sector to states
           const sectors: Record<string, {state: string; count: number}[]> = {};
