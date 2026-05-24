@@ -2,10 +2,11 @@
     background: var(--card-bg);
     border: 1px solid var(--card-border);
     border-radius: var(--radius-lg);
-    padding: 22px;
+    padding: 18px;
     display: flex;
     flex-direction: column;
     width: 100%;
+    min-height: 0;
     height: 100%;
   }
   
@@ -13,7 +14,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
   
   .title {
@@ -57,14 +58,15 @@
     flex-direction: column;
     gap: 2px;
     overflow-y: auto;
-    max-height: 380px;
+    flex: 1;
+    min-height: 0;
   }
   
   .row {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 8px;
+    padding: 8px 8px;
     border-radius: var(--radius-md);
     transition: background 0.15s ease;
     cursor: default;
