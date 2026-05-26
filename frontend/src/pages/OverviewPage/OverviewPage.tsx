@@ -156,7 +156,7 @@ export default function OverviewPage() {
         return acc;
       }, {}),
     };
-  }, [comparisonClockMs, periodTenderData?.items, selectedWindow.ms]);
+  }, [comparisonClockMs, periodTenderData, selectedWindow.ms]);
   const displayStats = periodStats ?? stats;
   const baseline       = useMemo(
     () =>
