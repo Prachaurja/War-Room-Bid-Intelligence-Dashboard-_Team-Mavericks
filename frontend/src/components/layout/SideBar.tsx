@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Home, Gavel, BarChart3, FileText,
   Bell, LogOut, Settings, ChevronRight,
-  Target, Wifi, HardDrive, PanelLeftClose,
+  Target, Wifi, HardDrive,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUIStore } from '../../store/ui.store';
@@ -167,19 +167,9 @@ export default function Sidebar() {
           </nav>
 
           <div className={styles.spacer} />
-          <div className={styles.collapseRow}>
-            <button
-              className={styles.collapseBtn}
-              type="button"
-              onClick={() => setSidebarOpen(false)}
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-            >
-              <PanelLeftClose size={15} />
-            </button>
-          </div>
+         
 
-          <div className={styles.divider} />
+
 
           <div className={styles.systemLinks}>
             <button
