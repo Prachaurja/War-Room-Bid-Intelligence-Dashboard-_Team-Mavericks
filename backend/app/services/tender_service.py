@@ -45,6 +45,7 @@ async def get_tenders(
             or_(
                 func.lower(Tender.title).like(term),
                 func.lower(Tender.agency).like(term),
+                func.lower(Tender.source_id).like(term),
             )
         )
 
