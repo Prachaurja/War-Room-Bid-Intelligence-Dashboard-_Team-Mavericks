@@ -150,10 +150,6 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
                 View on AusTender
               </a>
             )}
-            <button className={styles.bidBtn}>
-              <FileText size={14} />
-              Submit Bid
-            </button>
           </div>
         </motion.div>
       </motion.div>
