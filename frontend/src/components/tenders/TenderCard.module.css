@@ -67,8 +67,8 @@
   }
   
   .status_active   { background: rgba(16,185,129,0.12); color: #34D399; border-color: rgba(16,185,129,0.25); }
-  .status_upcoming { background: rgba(59,130,246,0.12);  color: #60A5FA; border-color: rgba(59,130,246,0.25); }
-  .status_closed   { background: rgba(107,114,128,0.12); color: #9CA3AF; border-color: rgba(107,114,128,0.25); }
+  .status_upcoming { background: rgba(245,158,11,0.07);  color: #F59E0B; border-color: rgba(245,158,11,0.25); }
+  .status_closed   { background: rgba(239, 68, 68, 0.07); color: #EF4444; border-color: rgba(239, 68, 68, 0.22); }
   
   .titleRow {
     display: flex;
