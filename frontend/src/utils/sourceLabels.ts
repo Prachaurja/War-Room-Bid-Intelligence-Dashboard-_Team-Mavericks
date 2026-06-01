@@ -3,6 +3,10 @@ const SOURCE_LABELS: Record<string, string> = {
   tendersnet: 'Tenders.Net',
   qld_tenders: 'QLD Tenders',
   nsw_etender: 'NSW eTender',
+  vic_tenders: 'VIC Tenders',
+  wa_tenders: 'WA Tenders',
+  sa_tenders: 'SA Tenders',
+  tas_tenders: 'TAS Tenders',
 };
 
 const SOURCE_DESCRIPTIONS: Record<string, string> = {
@@ -10,6 +14,9 @@ const SOURCE_DESCRIPTIONS: Record<string, string> = {
   tendersnet: 'Commercial tender aggregation',
   qld_tenders: 'Queensland government tenders',
   nsw_etender: 'NSW eTendering feed',
+  vic_tenders: 'Victorian government tenders',
+  wa_tenders: 'Western Australian government tenders',
+  sa_tenders: 'South Australian government tenders',
 };
 
 export function getSourceLabel(sourceName: string): string {

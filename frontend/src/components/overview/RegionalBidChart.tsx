@@ -49,7 +49,7 @@ import {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+            <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
               <XAxis
                 dataKey="state"
@@ -61,7 +61,7 @@ import {
                 tick={{ fill: 'var(--text-dim)', fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                width={36}
+                width={48}
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={36}>

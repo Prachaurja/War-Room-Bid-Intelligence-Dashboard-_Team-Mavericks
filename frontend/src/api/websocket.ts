@@ -1,4 +1,4 @@
-const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000/ws/live';
+const WS_URL = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/live`;
 
 type WSEvent = { type: string; payload: unknown };
 type Listener = (event: WSEvent) => void;

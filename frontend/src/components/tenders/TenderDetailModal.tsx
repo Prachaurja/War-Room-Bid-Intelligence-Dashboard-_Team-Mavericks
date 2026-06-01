@@ -124,7 +124,7 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
               <Row icon={Calendar} label="Close Date" value={formatDate(tender.close_date)} />
               <Row icon={Calendar} label="Published" value={formatDate(tender.published_date)} />
               <Row icon={Globe} label="Source" value={tender.source_name} />
-              <Row icon={Hash} label="Contract ID" value={tender.source_id} mono />
+              <Row icon={Hash} label="Source ID" value={tender.source_id} mono />
             </div>
           </div>
 
@@ -150,10 +150,6 @@ export default function TenderDetailModal({ tender, onClose }: Props) {
                 View on AusTender
               </a>
             )}
-            <button className={styles.bidBtn}>
-              <FileText size={14} />
-              Submit Bid
-            </button>
           </div>
         </motion.div>
       </motion.div>

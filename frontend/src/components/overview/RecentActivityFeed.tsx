@@ -14,11 +14,6 @@ export default function RecentActivityFeed() {
       <div className={styles.header}>
         <div>
           <h3 className={styles.title}>Recent Tenders</h3>
-          <p className={styles.sub}>Latest from AusTender</p>
-        </div>
-        <div className={styles.live}>
-          <span className={styles.liveDot} />
-          <span>AusTender</span>
         </div>
       </div>
 

@@ -3,56 +3,73 @@ import { loadPref, savePref } from '../utils/storage';
 
 export interface NotificationPreferences {
   email: boolean;
-  sms: boolean;
-  push: boolean;
+  sms:   boolean;
+  push:  boolean;
 }
 
-const PREF_KEY = 'war_room_notif_prefs';
 const PREF_EVENT = 'war-room:notif-prefs-changed';
 const DEFAULT_PREFS: NotificationPreferences = { email: true, sms: false, push: true };
 
-export function getNotificationPreferences(): NotificationPreferences {
-  return loadPref(PREF_KEY, DEFAULT_PREFS);
+function prefKey(userId: string): string {
+  return `wr_${userId}_notif_prefs`;
 }
 
-export function setNotificationPreferences(next: NotificationPreferences): void {
-  savePref(PREF_KEY, next);
+export function getNotificationPreferences(userId: string): NotificationPreferences {
+  return loadPref(prefKey(userId), DEFAULT_PREFS);
+}
+
+export function setNotificationPreferences(userId: string, next: NotificationPreferences): void {
+  savePref(prefKey(userId), next);
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent<NotificationPreferences>(PREF_EVENT, { detail: next }));
+    window.dispatchEvent(
+      new CustomEvent<{ userId: string; prefs: NotificationPreferences }>(PREF_EVENT, {
+        detail: { userId, prefs: next },
+      })
+    );
   }
 }
 
-export function useNotificationPreferences() {
-  const [prefs, setPrefs] = useState<NotificationPreferences>(() => getNotificationPreferences());
+export function useNotificationPreferences(userId?: string) {
+  const uid = userId ?? 'default';
+
+  const [prefs, setPrefsState] = useState<NotificationPreferences>(
+    () => getNotificationPreferences(uid)
+  );
 
   useEffect(() => {
-    const handleStorageSync = () => {
-      setPrefs(getNotificationPreferences());
-    };
+    setPrefsState(getNotificationPreferences(uid));
+  }, [uid]);
 
+  useEffect(() => {
+    const handleStorageSync = (e: StorageEvent) => {
+      if (e.key === prefKey(uid)) {
+        setPrefsState(getNotificationPreferences(uid));
+      }
+    };
     const handleCustomSync = (event: Event) => {
-      const detail = (event as CustomEvent<NotificationPreferences>).detail;
-      setPrefs(detail ?? getNotificationPreferences());
+      const { userId: eventUid, prefs: eventPrefs } =
+        (event as CustomEvent<{ userId: string; prefs: NotificationPreferences }>).detail ?? {};
+      if (eventUid === uid) {
+        setPrefsState(eventPrefs ?? getNotificationPreferences(uid));
+      }
     };
-
     window.addEventListener('storage', handleStorageSync);
     window.addEventListener(PREF_EVENT, handleCustomSync as EventListener);
-
     return () => {
       window.removeEventListener('storage', handleStorageSync);
       window.removeEventListener(PREF_EVENT, handleCustomSync as EventListener);
     };
-  }, []);
+  }, [uid]);
 
-  const updatePrefs = (updater: NotificationPreferences | ((prev: NotificationPreferences) => NotificationPreferences)) => {
-    setPrefs((prev) => {
-      const next = typeof updater === 'function'
-        ? (updater as (value: NotificationPreferences) => NotificationPreferences)(prev)
-        : updater;
-      setNotificationPreferences(next);
+  const setPrefs = (
+    updater: NotificationPreferences | ((prev: NotificationPreferences) => NotificationPreferences)
+  ) => {
+    setPrefsState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      setNotificationPreferences(uid, next);
       return next;
     });
   };
 
-  return { prefs, setPrefs: updatePrefs };
+  return { prefs, setPrefs };
 }

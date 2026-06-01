@@ -80,6 +80,7 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
   const [hoveredState,  setHoveredState]  = useState<string | null>(null);
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [tooltipPos,    setTooltipPos]    = useState<{ x: number; y: number } | null>(null);
+  const mapWrapRef = useRef<HTMLDivElement>(null);
   const svgRef   = useRef<SVGSVGElement>(null);
   const navigate = useNavigate();
 
@@ -98,11 +99,14 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
     [statsMap],
   );
 
-  const handleMouseMove = (stateKey: string, e: React.MouseEvent<SVGPathElement>) => {
-    if (!svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
+  const handleMouseMove = (stateKey: string, e: React.MouseEvent<SVGElement>) => {
+    if (!mapWrapRef.current) return;
+    const rect = mapWrapRef.current.getBoundingClientRect();
     setHoveredState(stateKey);
-    setTooltipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    setTooltipPos({
+      x: e.clientX - rect.left + 22,
+      y: e.clientY - rect.top + 12,
+    });
   };
 
   const handleMouseLeave = () => {
@@ -122,7 +126,7 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
     <div className={styles.mapContainer}>
 
       {/* ── SVG Map ── */}
-      <div className={styles.mapSvgWrap} aria-busy={isLoading}>
+      <div ref={mapWrapRef} className={styles.mapSvgWrap} aria-busy={isLoading}>
         <svg
           ref={svgRef}
           viewBox="0 0 800 640"
@@ -235,7 +239,7 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
                     strokeWidth="1"
                     strokeDasharray="3 3"
                     style={{ cursor: 'pointer' }}
-                    onMouseMove={e => handleMouseMove(key, e as unknown as React.MouseEvent<SVGPathElement>)}
+                    onMouseMove={e => handleMouseMove(key, e)}
                     onMouseLeave={handleMouseLeave}
                     onClick={() => handleStateClick(key)}
                   />
@@ -249,8 +253,13 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
                     textAnchor="middle"
                     fontSize={key === 'TAS' ? 10 : 13}
                     fontWeight={isSelected || isHovered ? '700' : '600'}
-                    fill={isSelected || isHovered ? meta.color : 'rgba(255,255,255,0.78)'}
-                    style={{ pointerEvents: 'none', userSelect: 'none', transition: 'fill 0.2s' }}
+                    fill={isSelected || isHovered ? 'var(--map-label-active)' : 'var(--map-label)'}
+                    style={{
+                      pointerEvents: 'none',
+                      userSelect: 'none',
+                      transition: 'fill 0.2s',
+                      filter: 'drop-shadow(0 1px 1px var(--map-label-shadow))',
+                    }}
                   >
                     {key}
                   </text>
@@ -263,7 +272,7 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
                       y1={labelPos.y}
                       x2={ACT_HIT_TARGET.labelX - 16}
                       y2={ACT_HIT_TARGET.labelY - 4}
-                      stroke={isHovered || isSelected ? meta.color : 'rgba(255,255,255,0.48)'}
+                      stroke={isHovered || isSelected ? 'var(--map-label-active)' : 'var(--map-callout-line)'}
                       strokeWidth="1"
                       strokeDasharray="3 3"
                       style={{ pointerEvents: 'none' }}
@@ -274,8 +283,13 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
                       textAnchor="start"
                       fontSize="11"
                       fontWeight={isSelected || isHovered ? '800' : '700'}
-                      fill={isSelected || isHovered ? meta.color : 'rgba(255,255,255,0.86)'}
-                      style={{ pointerEvents: 'none', userSelect: 'none', transition: 'fill 0.2s' }}
+                      fill={isSelected || isHovered ? 'var(--map-label-active)' : 'var(--map-label)'}
+                      style={{
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                        transition: 'fill 0.2s',
+                        filter: 'drop-shadow(0 1px 1px var(--map-label-shadow))',
+                      }}
                     >
                       ACT
                     </text>
@@ -328,8 +342,8 @@ export default function AustraliaMap({ stateStats, isLoading }: Props) {
             <motion.div
               className={styles.mapTooltip}
               style={{
-                left: Math.min(tooltipPos.x + 16, 560),
-                top:  Math.max(tooltipPos.y - 10, 4),
+                left: tooltipPos.x,
+                top: Math.max(tooltipPos.y, 4),
               }}
               initial={{ opacity: 0, scale: 0.93, y: 4 }}
               animate={{ opacity: 1, scale: 1,    y: 0 }}

@@ -5,18 +5,27 @@ from sqlalchemy.orm import relationship
 import uuid
 from app.core.database import Base
 
+
 class User(Base):
     __tablename__ = "users"
 
     id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email           = Column(String(255), unique=True, nullable=False, index=True)
     name            = Column(String(255), nullable=False)
-    role            = Column(String(50), nullable=False, default="analyst")
+    role            = Column(String(50),  nullable=False, default="analyst")
     hashed_password = Column(String(255), nullable=False)
     is_active       = Column(Boolean, default=True)
+
+    # ── Phase 3: 2FA ─────────────────────────────────────────
+    totp_secret     = Column(String(64),  nullable=True)
+    totp_enabled    = Column(Boolean,     default=False)
+
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
 
-
-    alerts         = relationship("Alert",       back_populates="user", cascade="all, delete-orphan")
-    saved_searches = relationship("SavedSearch", back_populates="user", cascade="all, delete-orphan")
+    # ── Relationships ─────────────────────────────────────────
+    alerts          = relationship("Alert",        back_populates="user", cascade="all, delete-orphan")
+    saved_searches  = relationship("SavedSearch",  back_populates="user", cascade="all, delete-orphan")
+    sessions        = relationship("Session",      back_populates="user", cascade="all, delete-orphan")
+    api_keys        = relationship("ApiKey",       back_populates="user", cascade="all, delete-orphan")
+    recovery_codes  = relationship("RecoveryCode", back_populates="user", cascade="all, delete-orphan")

@@ -1,35 +1,24 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+﻿import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
 import {
   LayoutDashboard, Home, Gavel, BarChart3, FileText,
   Bell, LogOut, Settings, ChevronRight,
-  Target, Wifi, X, RefreshCw, Database, HardDrive,
+  Target, Wifi, HardDrive,
 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { useUIStore } from '../../store/ui.store';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useAlerts } from '../../hooks/useAlerts';
-import { useOverviewStats } from '../../hooks/useTenders';
-import { getSourceDescription, getSourceLabel } from '../../utils/sourceLabels';
 import clsx from 'clsx';
 import styles from './SideBar.module.css';
 
-type SystemPanelKey = 'sources' | null;
-
 export default function Sidebar() {
   const { user, logout } = useAuth();
-  const {
-    sidebarOpen,
-  } = useUIStore();
-  const location    = useLocation();
-  const navigate    = useNavigate();
-  const queryClient = useQueryClient();
-  const { status, newTenders, newAlerts, clearCounters } = useWebSocket();
+  const { sidebarOpen, setSidebarOpen }  = useUIStore();
+  const location         = useLocation();
+  const navigate         = useNavigate();
+  const { status, newTenders, newAlerts } = useWebSocket();
   const { data: alertsData } = useAlerts();
-  const { data: stats } = useOverviewStats();
-  const [systemPanel, setSystemPanel] = useState<SystemPanelKey>(null);
 
   const unreadCount = (alertsData ?? []).filter((a) => !a.read).length;
   const totalBadge  = unreadCount + newAlerts;
@@ -38,14 +27,20 @@ export default function Sidebar() {
   const isConnecting = status === 'connecting';
   const hasNewData   = newTenders > 0;
 
+  const closeOnMobileNavigation = () => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) {
+      setSidebarOpen(false);
+    }
+  };
+
   const NAV_ITEMS = [
-    { label: 'Home',       path: '/home',       icon: Home,            badge: null },
-    { label: 'Overview',   path: '/',           icon: LayoutDashboard, badge: null },
-    { label: 'Tenders',    path: '/tenders',    icon: Gavel,           badge: null },
-    { label: 'Analytics',  path: '/analytics',  icon: BarChart3,       badge: null },
-    { label: 'Reports',    path: '/reports',    icon: FileText,        badge: null },
-    { label: 'Alerts',     path: '/alerts',     icon: Bell,            badge: totalBadge > 0 ? String(totalBadge) : null },
-    { label: 'Data Sources', path: '/data-sources', icon: HardDrive,  badge: null },
+    { label: 'Home',         path: '/',             icon: Home,            badge: null },
+    { label: 'Overview',     path: '/overview',     icon: LayoutDashboard, badge: null },
+    { label: 'Tenders',      path: '/tenders',      icon: Gavel,           badge: null },
+    { label: 'Analytics',    path: '/analytics',    icon: BarChart3,       badge: null },
+    { label: 'Reports',      path: '/reports',      icon: FileText,        badge: null },
+    { label: 'Alerts',       path: '/alerts',       icon: Bell,            badge: totalBadge > 0 ? String(totalBadge) : null },
+    { label: 'Data Sources', path: '/data-sources', icon: HardDrive,       badge: null },
   ];
 
   const initials = user?.name
@@ -55,65 +50,9 @@ export default function Sidebar() {
     .toUpperCase()
     .slice(0, 2) ?? 'WR';
 
-  const systemButtons = [
-    { key: 'sources', label: 'Data Sources', icon: Database },
-  ] as const;
-
-  const closeSystemPanel = () => setSystemPanel(null);
-
-  const renderSystemPanel = () => {
-    if (!systemPanel) return null;
-
-    if (systemPanel === 'sources') {
-      const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
-      const sourceEntries = Object.entries(stats?.sources ?? {})
-        .filter(([, count]) => count > 0)
-        .sort((a, b) => b[1] - a[1]);
-
-      return (
-        <div className={styles.systemPanelBody}>
-          {sourceEntries.map(([sourceName, count]) => (
-            <div key={sourceName} className={styles.sourceCard}>
-              <div>
-                <p className={styles.sourceCardTitle}>{getSourceLabel(sourceName)}</p>
-                <p className={styles.sourceCardSub}>{getSourceDescription(sourceName)}</p>
-              </div>
-              <span className={styles.sourceCardCount}>{count}</span>
-            </div>
-          ))}
-          <div className={styles.sourceRow}>
-            <span className={styles.sourceLabel}>API Endpoint</span>
-            <span className={styles.sourceValue}>{apiUrl}</span>
-          </div>
-          <div className={styles.sourceRow}>
-            <span className={styles.sourceLabel}>WebSocket</span>
-            <span className={styles.sourceValue}>{status}</span>
-          </div>
-          <div className={styles.sourceRow}>
-            <span className={styles.sourceLabel}>Unread Alerts</span>
-            <span className={styles.sourceValue}>{unreadCount}</span>
-          </div>
-          <div className={styles.sourceRow}>
-            <span className={styles.sourceLabel}>New Tenders</span>
-            <span className={styles.sourceValue}>{newTenders}</span>
-          </div>
-          <div className={styles.systemActionRow}>
-            <button
-              className={styles.systemGhostBtn}
-              onClick={() => {
-                clearCounters();
-                void queryClient.invalidateQueries();
-              }}
-            >
-              <RefreshCw size={13} />
-              Refresh
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+  // Read avatar scoped to current user's ID to prevent cross-user contamination.
+  const avatarKey = `wr_avatar_${user?.id ?? 'default'}`;
+  const avatarSrc = user?.avatar ?? localStorage.getItem(avatarKey) ?? '';
 
   return (
     <AnimatePresence>
@@ -198,6 +137,7 @@ export default function Sidebar() {
                 <NavLink
                   key={item.path}
                   to={item.path}
+                  onClick={closeOnMobileNavigation}
                   className={clsx(styles.navItem, isActive && styles.navItemActive)}
                 >
                   {isActive && (
@@ -227,24 +167,16 @@ export default function Sidebar() {
           </nav>
 
           <div className={styles.spacer} />
-          <div className={styles.divider} />
+         
+
+
 
           <div className={styles.systemLinks}>
-            {systemButtons.map((button) => (
-              <button
-                key={button.key}
-                className={clsx(styles.systemItem, systemPanel === button.key && styles.systemItemActive)}
-                onClick={() => setSystemPanel((current) => current === button.key ? null : button.key)}
-              >
-                <button.icon size={15} />
-                <span>{button.label}</span>
-              </button>
-            ))}
             <button
               className={clsx(styles.systemItem, location.pathname === '/settings' && styles.systemItemActive)}
               onClick={() => {
-                closeSystemPanel();
                 navigate('/settings');
+                closeOnMobileNavigation();
               }}
             >
               <Settings size={15} />
@@ -252,36 +184,23 @@ export default function Sidebar() {
             </button>
           </div>
 
-          <AnimatePresence>
-            {systemPanel && (
-              <motion.div
-                className={styles.systemPanel}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{    opacity: 0, y: 8 }}
-              >
-                <div className={styles.systemPanelHeader}>
-                  <div>
-                    <p className={styles.systemPanelTitle}>
-                      Data Sources
-                    </p>
-                    <p className={styles.systemPanelSub}>
-                      Active feeds, source coverage, and connectivity status
-                    </p>
-                  </div>
-                  <button className={styles.systemPanelClose} onClick={closeSystemPanel}>
-                    <X size={14} />
-                  </button>
-                </div>
-                {renderSystemPanel()}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           <div className={styles.divider} />
 
+          {/* User section with per-user avatar */}
           <div className={styles.userSection}>
-            <div className={styles.avatar}>{initials}</div>
+            <div className={clsx(styles.avatar, avatarSrc ? styles.avatarWithImage : styles.avatarFallback)}>
+              {avatarSrc
+                ? <img
+                    src={avatarSrc}
+                    alt={`${user?.name ?? 'User'} avatar`}
+                    style={{
+                      width: '100%', height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: 'inherit',
+                    }}
+                  />
+                : initials}
+            </div>
             <div className={styles.userInfo}>
               <p className={styles.userName}>{user?.name ?? 'Analyst'}</p>
               <p className={styles.userRole}>{user?.role ?? 'admin'}</p>
@@ -290,8 +209,10 @@ export default function Sidebar() {
               <LogOut size={15} />
             </button>
           </div>
+
         </motion.aside>
       )}
     </AnimatePresence>
   );
 }
+
